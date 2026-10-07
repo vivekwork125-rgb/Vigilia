@@ -4,6 +4,8 @@
 
 A standalone hackathon prototype that connects natural-language event search to source footage, exact frames, timelines, relationships, and evidence-backed reports. Observed facts, correlations, and inferences are kept visibly separate.
 
+![VIGILIA investigation workspace](docs/preview.jpg)
+
 ## Run locally
 
 Requirements: Python 3.12 or 3.13, Node 20.9+ (22 recommended), and npm.

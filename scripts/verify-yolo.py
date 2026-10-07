@@ -89,7 +89,10 @@ with session() as s:
         .join(Evidence, Event.evidence_id == Evidence.id)
         .where(Evidence.video_id == vid)
     ).all()
-    result = search(s, "person stopped", camera="SMOKE-CAM")
+    result = search(s, "person stopped", camera="SMOKE-CAM", limit=100)
+    result["results"] = [
+        event for event in result["results"] if event["video_id"] == vid
+    ]
     assert observations and events and result["results"]
     report = {
         "test": "YOLO11n + ByteTrack / actual pretrained model integration",

@@ -2,10 +2,10 @@
   "test": "YOLO11n + ByteTrack / actual pretrained model integration",
   "source": "Ultralytics packaged assets/bus.jpg, repeated for 5 seconds",
   "not_a_video_accuracy_benchmark": true,
-  "video_id": "SMOKE-69272E5C3374",
+  "video_id": "SMOKE-AEF07155F79F",
   "observations": 5,
   "events": 10,
-  "person_stopped_results": 8,
+  "person_stopped_results": 4,
   "pipeline": "YOLO + ByteTrack",
   "event_types": [
     "appeared",
