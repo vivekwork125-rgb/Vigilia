@@ -1,4 +1,6 @@
-# Verification record
+# Verification record (historical baseline)
+
+For the current completion audit and expanded test suite, see [FINAL_VERIFICATION.md](FINAL_VERIFICATION.md).
 
 ## User story
 

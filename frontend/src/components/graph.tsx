@@ -15,7 +15,8 @@ interface Edge {
   target: string;
   label: string;
   category: string;
-  evidence_id: string;
+  evidence_id: string | null;
+  event_id?: string | null;
 }
 interface Graph {
   nodes: Node[];
@@ -50,7 +51,12 @@ export function EvidenceGraph({
     };
   }, []);
   const primary = graph.nodes.find((n) => n.id === entity);
-  const links = graph.edges.filter((e) => e.source === entity);
+  const links = graph.edges.filter(
+    (e) => e.source === entity && graph.nodes.some((n) => n.id === e.target && n.kind === "event"),
+  );
+  const direct = graph.edges.filter(
+    (e) => e.event_id && (e.source === entity || e.target === entity),
+  );
   const events = links
     .map((e) => graph.nodes.find((n) => n.id === e.target))
     .filter((n): n is Node => !!n);
@@ -96,7 +102,7 @@ export function EvidenceGraph({
             }}
           >
             {graph.nodes
-              .filter((n) => n.kind !== "event")
+              .filter((n) => !["event", "camera", "location"].includes(n.kind))
               .map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.id} · {n.kind} · {n.camera_id}
@@ -351,6 +357,21 @@ export function EvidenceGraph({
               <GitBranch size={36} className="muted" />
               <p>Select a node to inspect its source evidence.</p>
             </>
+          )}
+          {direct.length > 0 && (
+            <div className="graph-note">
+              <h4>Stored relationships</h4>
+              {direct.map((edge) => (
+                <button
+                  className="text-button"
+                  key={`${edge.source}-${edge.target}-${edge.evidence_id}`}
+                  onClick={() => edge.event_id && onOpen(edge.event_id)}
+                >
+                  {edge.label.replaceAll("_", " ")} · {edge.source === entity ? edge.target : edge.source} · {edge.category}
+                  <ArrowRight size={14} />
+                </button>
+              ))}
+            </div>
           )}
           <div className="graph-note">
             <h4>No hidden identity links</h4>

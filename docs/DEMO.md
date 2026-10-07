@@ -1,0 +1,9 @@
+# Demonstration: distinguish the two fixtures
+
+Run `./scripts/dev.sh` and open [the local workspace](http://localhost:3100/). The original east-entrance/west-plaza/parking clips contain authored event labels. They are useful for UI and query-parser demonstrations, but **not** for proving action detection or field accuracy.
+
+For a pipeline-generated action sequence, search **“unattended bag”** and select the result from `CAM-PIPELINE-DEMO`. It should open the 30-second synthetic video near 12 seconds, with an INFERRED label, source frame range, box overlay, and provenance. In the same entity timeline, select the placement near 5 seconds, then pickup near 22 seconds; the video should seek to each event. Switch to Evidence graph, focus the pipeline person entity, and click the stored `unattended` relationship to open its source. Collect a finding and export the report; confirm the evidence ID and inference status appear. The video is actually decoded, color-contour detections are made from its pixels, tracks are persisted, and the ordinary event rules create these records. The detector is deliberately fixture-specific and should never be described as a real-camera model.
+
+To verify an upload through the real API path, use Footage Library to upload consented short footage, set a timezone-aware recording start, index it, and search its generated events. The default HOG adapter can detect people only. Use the optional YOLO adapter for objects/vehicles, and inspect results before claiming any behavior occurred. `tests/test_temporal_intelligence.py` supplies an automated encoded-video upload → pixel detection → tracking → placement → search → evidence → report chain without injecting event labels.
+
+The 40-query Evaluation Lab run tests retrieval of **authored** fixture labels. No independent field-video accuracy or human time-reduction conclusion follows from it. For such claims, use the protocols in [EVALUATION.md](EVALUATION.md).

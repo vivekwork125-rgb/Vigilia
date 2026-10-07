@@ -40,6 +40,8 @@ export function EvidenceWorkspace({
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [playback, setPlayback] = useState(event.evidence.timestamp_start);
   const [overlay, setOverlay] = useState(true);
+  const [timelineCategory, setTimelineCategory] = useState("ALL");
+  const [timelineWindow, setTimelineWindow] = useState("ALL");
   const [size, setSize] = useState([768, 432]);
   useEffect(() => {
     setEntity(event.entities[0]?.id || "");
@@ -98,6 +100,12 @@ export function EvidenceWorkspace({
   );
   const box =
     nearest && Math.abs(nearest.t - playback) < 0.55 ? nearest.box : null;
+  const selectedTime = new Date(event.start).getTime();
+  const visibleTimeline = timeline.filter((item) => {
+    if (timelineCategory !== "ALL" && item.category !== timelineCategory) return false;
+    if (timelineWindow === "ALL") return true;
+    return Math.abs(new Date(item.start).getTime() - selectedTime) <= Number(timelineWindow) * 1000;
+  });
   return (
     <div className="investigation-layout">
       <div className="evidence-main">
@@ -182,7 +190,11 @@ export function EvidenceWorkspace({
               <Badge category={event.category} />
               <span className="mono">{event.id}</span>
               {event.is_demo && (
-                <span className="tiny-tag">SYNTHETIC ANNOTATION</span>
+                <span className="tiny-tag">
+                  {event.evidence.method.startsWith("Authored")
+                    ? "SYNTHETIC ANNOTATION"
+                    : "SYNTHETIC VIDEO · PIXEL INDEXED"}
+                </span>
               )}
             </div>
             <h2>{event.title}</h2>
@@ -211,6 +223,17 @@ export function EvidenceWorkspace({
               </h2>
               <p>Within-camera observations, ordered by source time.</p>
             </div>
+            <select aria-label="Timeline evidence status" value={timelineCategory} onChange={(e) => setTimelineCategory(e.target.value)}>
+              <option value="ALL">All evidence</option>
+              <option value="OBSERVED">Observed</option>
+              <option value="CORRELATED">Correlated</option>
+              <option value="INFERRED">Inferred</option>
+            </select>
+            <select aria-label="Timeline zoom" value={timelineWindow} onChange={(e) => setTimelineWindow(e.target.value)}>
+              <option value="ALL">Full timeline</option>
+              <option value="15">±15 seconds</option>
+              <option value="60">±1 minute</option>
+            </select>
             <select
               aria-label="Timeline entity"
               value={entity}
@@ -224,7 +247,7 @@ export function EvidenceWorkspace({
             </select>
           </div>
           <div className="timeline">
-            {timeline.map((e, i) => (
+            {visibleTimeline.map((e) => (
               <button
                 className={`timeline-event ${e.id === event.id ? "selected" : ""}`}
                 key={e.id}
@@ -237,7 +260,7 @@ export function EvidenceWorkspace({
                 <div>
                   <strong>{e.title}</strong>
                   <small>
-                    {e.id} · {e.camera_id}
+                    {e.id} · {e.camera_id} · {e.entities.map((x) => x.id).join(", ")} · {e.confidence == null ? "Detection confidence not measured" : `Detection ${(e.confidence * 100).toFixed(0)}%`}
                   </small>
                 </div>
                 <Badge category={e.category} />
@@ -401,7 +424,11 @@ export function EvidenceWorkspace({
             a possible link. <b>Inferred</b> needs verification.
           </p>
           {event.is_demo && (
-            <p>This source is generated footage with authored annotations.</p>
+            <p>
+              {event.evidence.method.startsWith("Authored")
+                ? "This synthetic source has authored event annotations."
+                : "This synthetic source was indexed from decoded video pixels; interaction labels are unverified hypotheses."}
+            </p>
           )}
         </section>
       </aside>

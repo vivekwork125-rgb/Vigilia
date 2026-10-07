@@ -36,6 +36,7 @@ from .db import (
     uid,
 )
 from .demo import seed
+from .demo_pipeline import seed_pipeline_demo
 from .evidence import serialize_event, entity_timeline
 from .evaluation import run_evaluation
 from .processing import start_worker, stop
@@ -54,6 +55,7 @@ async def lifespan(app):
     initialize()
     if config.DEMO_MODE:
         seed()
+        seed_pipeline_demo()
     worker = start_worker()
     yield
     stop.set()
@@ -452,6 +454,15 @@ def graph():
     with session() as s:
         entities = s.scalars(select(Entity)).all()
         events = s.scalars(select(Event).order_by(Event.start).limit(200)).all()
+        cameras = s.scalars(select(Camera)).all()
+        locations = s.scalars(select(Location)).all()
+        relationships = s.scalars(select(Relationship)).all()
+        event_by_evidence = {
+            evidence_id: event_id
+            for event_id, evidence_id in s.execute(
+                select(Event.id, Event.evidence_id)
+            ).all()
+        }
         nodes = [
             {
                 "id": e.id,
@@ -463,6 +474,48 @@ def graph():
             for e in entities
         ]
         edges = []
+        nodes.extend(
+            {
+                "id": c.id,
+                "label": c.name,
+                "kind": "camera",
+                "category": "OBSERVED",
+                "camera_id": c.id,
+            }
+            for c in cameras
+        )
+        nodes.extend(
+            {
+                "id": loc.id,
+                "label": loc.name,
+                "kind": "location",
+                "category": "OBSERVED",
+                "camera_id": "",
+            }
+            for loc in locations
+        )
+        edges.extend(
+            {
+                "source": c.id,
+                "target": c.location_id,
+                "label": "located_at",
+                "category": "OBSERVED",
+                "evidence_id": None,
+                "event_id": None,
+            }
+            for c in cameras
+        )
+        edges.extend(
+            {
+                "source": e.id,
+                "target": e.camera_id,
+                "label": "observed_at",
+                "category": "OBSERVED",
+                "evidence_id": None,
+                "event_id": None,
+            }
+            for e in entities
+        )
         for e in events:
             nodes.append(
                 {
@@ -485,6 +538,17 @@ def graph():
                         "evidence_id": e.evidence_id,
                     }
                 )
+        for rel in relationships:
+            edges.append(
+                {
+                    "source": rel.source_id,
+                    "target": rel.target_id,
+                    "label": rel.relation,
+                    "category": rel.category,
+                    "evidence_id": rel.evidence_id,
+                    "event_id": event_by_evidence.get(rel.evidence_id),
+                }
+            )
         return {"nodes": nodes, "edges": edges}
 
 
@@ -492,8 +556,53 @@ def graph():
 def evidence(evidence_id: str):
     with session() as s:
         item = require(s, Evidence, evidence_id)
+        observation = (
+            s.get(Observation, item.observation_id) if item.observation_id else None
+        )
+        source_boxes = (
+            [
+                box
+                for box in observation.boxes
+                if item.frame_start <= box["frame"] <= item.frame_end
+            ]
+            if observation
+            else []
+        )
+        event = s.scalar(select(Event).where(Event.evidence_id == item.id))
+        entity_ids = (
+            s.scalars(
+                select(EventEntity.entity_id).where(EventEntity.event_id == event.id)
+            ).all()
+            if event
+            else []
+        )
+        supporting = (
+            s.scalars(
+                select(Observation).where(
+                    Observation.video_id == item.video_id,
+                    Observation.entity_id.in_(entity_ids),
+                )
+            ).all()
+            if entity_ids
+            else []
+        )
         return {
             **row(item),
+            "observation": row(observation) if observation else None,
+            "track_id": observation.track_id if observation else None,
+            "source_boxes": source_boxes,
+            "supporting_tracks": [
+                {
+                    "entity_id": obs.entity_id,
+                    "track_id": obs.track_id,
+                    "boxes": [
+                        box
+                        for box in obs.boxes
+                        if item.frame_start <= box["frame"] <= item.frame_end
+                    ],
+                }
+                for obs in supporting
+            ],
             "source": {
                 k: v for k, v in row(s.get(Video, item.video_id)).items() if k != "path"
             },

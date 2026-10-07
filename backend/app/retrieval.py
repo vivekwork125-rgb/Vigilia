@@ -20,6 +20,7 @@ from .db import (
 )
 from .config import WEIGHTS
 from .evidence import serialize_event
+from .temporal import matches as temporal_matches
 
 COLORS = ("red", "blue", "green", "yellow", "white", "black", "gray", "purple")
 EVENT_PATTERNS = [
@@ -152,6 +153,12 @@ def parse_query(query):
     if "near this event" in q:
         result["temporal_relation"] = "near"
         result["window_seconds"] = 120
+    if "overlap" in q and "this event" in q:
+        result["temporal_relation"] = "overlaps"
+        result["window_seconds"] = 0
+    if "followed by this event" in q:
+        result["temporal_relation"] = "followed_by"
+        result["window_seconds"] = 300
     if not any(
         result[k] is not None
         for k in ("entity", "color", "event", "camera", "location", "after", "before")
@@ -177,7 +184,7 @@ def clock_matches(start, after, before):
     return (after is None or minute >= after) and (before is None or minute <= before)
 
 
-def coverage(s, parsed):
+def coverage(s, parsed, has_match=False):
     videos = s.scalars(select(Video)).all()
     if parsed.get("camera"):
         videos = [v for v in videos if v.camera_id == parsed["camera"]]
@@ -206,7 +213,11 @@ def coverage(s, parsed):
             }
             for v in videos
         ],
-        "conclusion": "No matching observation above threshold. This does not establish absence.",
+        "conclusion": (
+            "Matching indexed events were retrieved; source evidence still requires review."
+            if has_match
+            else "No matching indexed event under the evaluated filters and threshold. This does not establish absence."
+        ),
         "absence_confidence": "not established",
     }
 
@@ -259,7 +270,7 @@ def search(
         statement = (
             statement.join(Evidence, Event.evidence_id == Evidence.id)
             .join(Video, Evidence.video_id == Video.id)
-            .where(Video.is_demo.is_(True))
+            .where(Video.id.like("VID-DEMO-%"))
         )
     if parsed["camera"]:
         statement = statement.where(Event.camera_id == parsed["camera"])
@@ -345,26 +356,14 @@ def search(
                     e["id"] for e in entities
                 ):
                     continue
-                delta = (
-                    (datetime.fromisoformat(target.start) - end).total_seconds()
-                    if parsed["temporal_relation"] == "before"
-                    else (start - datetime.fromisoformat(target.end)).total_seconds()
+                compatible = temporal_matches(
+                    start,
+                    end,
+                    target.start,
+                    target.end,
+                    parsed["temporal_relation"],
+                    parsed["window_seconds"] or 0,
                 )
-                if parsed["temporal_relation"] == "during":
-                    compatible = datetime.fromisoformat(
-                        target.start
-                    ) <= start and end <= datetime.fromisoformat(target.end)
-                elif parsed["temporal_relation"] == "near":
-                    compatible = (
-                        abs(
-                            (
-                                start - datetime.fromisoformat(target.start)
-                            ).total_seconds()
-                        )
-                        <= parsed["window_seconds"]
-                    )
-                else:
-                    compatible = 0 <= delta <= parsed["window_seconds"]
                 if compatible:
                     supporting_temporal.append(target.id)
             if not supporting_temporal:
@@ -436,7 +435,11 @@ def search(
         "total": len(results),
         "candidates_evaluated": len(items),
         "elapsed_ms": round((time.perf_counter() - begun) * 1000, 2),
-        "coverage": coverage(s, parsed),
+        "coverage": coverage(s, parsed, bool(results)),
+        "match_threshold": {
+            "unconstrained_semantic_minimum": 0.12,
+            "structured_query": "hard filters; no additional semantic minimum",
+        },
         "score_notice": "Relevance is a retrieval score, not an identity probability. Null signals were not evaluated.",
     }
 

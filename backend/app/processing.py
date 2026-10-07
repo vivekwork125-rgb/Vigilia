@@ -8,9 +8,20 @@ import cv2
 import numpy as np
 from sqlalchemy import select, update
 from .config import SAMPLE_FPS
-from .db import Camera, Embedding, Entity, Observation, Track, Video, session, uid
+from .db import (
+    Camera,
+    Embedding,
+    Entity,
+    Observation,
+    Relationship,
+    Track,
+    Video,
+    session,
+    uid,
+)
 from .evidence import create_event
 from .vision import detector, dominant_color, appearance, ClipEncoder
+from .temporal_events import track_events
 
 log = logging.getLogger("vigilia.worker")
 stop = threading.Event()
@@ -26,7 +37,7 @@ def progress(video_id, state, value):
 
 
 def extract_events(samples, duration):
-    """Conservative track rules. State changes are hypotheses; detections are observed."""
+    """Per-track scene boundary and stationary transitions."""
     result = [("appeared", samples[0]["t"], samples[0]["t"], "OBSERVED")]
     if samples[-1]["t"] < duration - 2 / SAMPLE_FPS:
         result.append(("disappeared", samples[-1]["t"], samples[-1]["t"], "INFERRED"))
@@ -51,14 +62,14 @@ def extract_events(samples, duration):
     return result
 
 
-def process(video_id):
+def process(video_id, model_override=None):
     with session() as s:
         video = s.get(Video, video_id)
         if not video:
             return
         path, duration = video.path, video.duration
     progress(video_id, "processing", 2)
-    model = detector()
+    model = model_override or detector()
     clip = (
         ClipEncoder() if os.getenv("ENABLE_CLIP", "false").lower() == "true" else None
     )
@@ -93,7 +104,7 @@ def process(video_id):
                     previous is not None
                     and np.mean(np.abs(gray.astype(float) - previous)) > 70
                 ):
-                    model = detector()
+                    model = model_override or detector()
                     scene += 1
                 elif previous is None:
                     scene = 0
@@ -204,75 +215,61 @@ def process(video_id):
                     f"{color.title()} {typ} {kind.replace('_', ' ')}",
                     start,
                     end,
-                    confidence=obs.confidence,
+                    confidence=obs.confidence if category == "OBSERVED" else None,
                     category=category,
                     attributes=attrs,
                     observation=obs.id,
                     method=model.name + " + geometric rules",
                 )
-            # User-defined rectangular normalized camera zones.
-            for zone in camera.connections.get("zones", []):
-                inside = []
-                for sample in samples:
-                    x1, y1, x2, y2 = sample["box"]
-                    x, y = (x1 + x2) / 2 / video.width, y2 / video.height
-                    if (
-                        zone["rect"][0] <= x <= zone["rect"][2]
-                        and zone["rect"][1] <= y <= zone["rect"][3]
-                    ):
-                        inside.append(sample)
-                if inside:
-                    create_event(
-                        s,
-                        video,
-                        [entity.id],
-                        "entered_zone",
-                        f"{typ.title()} detected in {zone['name']}",
-                        inside[0]["t"],
-                        inside[-1]["t"],
-                        category="INFERRED",
-                        attributes={**attrs, "zone": zone["name"]},
-                        observation=obs.id,
-                        method="bounding-box footpoint in configured rectangle",
-                    )
-        # Pairwise approach hypothesis; never interprets proximity as actual contact.
-        keys = list(track_entities)
-        for person_key in keys:
-            person, obs = track_entities[person_key]
-            if person.object_type != "person":
+        # Every interaction is derived from the same detector/tracker samples.
+        for candidate in track_events(
+            tracks,
+            video.width,
+            video.height,
+            zones=camera.connections.get("zones", []),
+        ):
+            if candidate.kind == "stopped":
+                continue  # Already emitted by the backward-compatible per-track rule.
+            primary = track_entities.get(candidate.keys[0])
+            if primary is None:
                 continue
-            for other_key in keys:
-                other, _ = track_entities[other_key]
-                if other.object_type not in ("car", "truck", "bus", "motorcycle"):
-                    continue
-                other_frames = {x["frame"]: x for x in tracks[other_key]}
-                distances = []
-                for x in tracks[person_key]:
-                    if x["frame"] not in other_frames:
-                        continue
-                    a, b = x["box"], other_frames[x["frame"]]["box"]
-                    d = np.linalg.norm(
-                        np.array([(a[0] + a[2]) / 2, (a[1] + a[3]) / 2])
-                        - np.array([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2])
-                    ) / max(1, video.width)
-                    distances.append((x["t"], d))
-                if (
-                    len(distances) >= 3
-                    and distances[0][1] - distances[-1][1] > 0.12
-                    and distances[-1][1] < 0.2
-                ):
-                    create_event(
-                        s,
-                        video,
-                        [person.id, other.id],
-                        "approached_vehicle",
-                        "Person may have approached a vehicle",
-                        distances[0][0],
-                        distances[-1][0],
-                        category="INFERRED",
-                        observation=obs.id,
-                        method="normalized center-distance decrease",
+            entities = [
+                track_entities[key][0].id
+                for key in candidate.keys
+                if key in track_entities
+            ]
+            if len(entities) != len(candidate.keys):
+                continue
+            labels = [track_entities[key][0].object_type for key in candidate.keys]
+            event = create_event(
+                s,
+                video,
+                entities,
+                candidate.kind,
+                f"{' and '.join(labels).title()} {candidate.kind.replace('_', ' ')}",
+                candidate.start,
+                candidate.end,
+                category=candidate.category,
+                attributes=candidate.attributes,
+                observation=primary[1].id,
+                method=model.name + " + " + candidate.method,
+            )
+            if len(entities) == 2:
+                s.add(
+                    Relationship(
+                        id=uid("REL"),
+                        source_id=entities[0],
+                        target_id=entities[1],
+                        evidence_id=event.evidence_id,
+                        relation=candidate.kind,
+                        category=candidate.category,
+                        signals={
+                            "method": candidate.method,
+                            "source_interval": [candidate.start, candidate.end],
+                        },
+                        explanation="Track geometry supports this hypothesis; proximity does not establish identity, possession, or intent.",
                     )
+                )
         for t, text, conf in ocr:
             create_event(
                 s,

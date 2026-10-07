@@ -1,99 +1,55 @@
 # VIGILIA
 
-**Evidence-Grounded Surveillance Intelligence**
-
-A standalone hackathon prototype that connects natural-language event search to source footage, exact frames, timelines, relationships, and evidence-backed reports. Observed facts, correlations, and inferences are kept visibly separate.
+Evidence-grounded video investigation prototype. [GitHub repository](https://github.com/vivekwork125-rgb/Vigilia).
 
 ![VIGILIA investigation workspace](docs/preview.jpg)
 
-## Run locally
+## Problem
 
-Requirements: Python 3.12 or 3.13, Node 20.9+ (22 recommended), and npm.
+Reviewing long recordings across cameras takes time. A search hit is useful only if an investigator can inspect the exact source frames and distinguish visible facts from behavioral hypotheses.
+
+## Solution
+
+VIGILIA ingests source video, records its hash and camera time, samples frames, detects and tracks entities, extracts conservative temporal events, and indexes source-linked evidence. Investigators can search, open the video at an event, inspect its timeline and relationships, collect findings, and export an evidence-backed report. Retrieval scores are ranking signals, not identity probabilities.
+
+## Architecture and technology stack
+
+Next.js 16/React/TypeScript provides the workspace and same-origin API proxy. FastAPI, SQLAlchemy, OpenCV, and scikit-learn implement ingestion, processing, evidence, and retrieval. SQLite is the verified local database. A PostgreSQL/pgvector Compose configuration exists but could not be run on the current host. The local CPU baseline is OpenCV HOG for people; YOLO11n + ByteTrack is an optional model adapter with a limited integration smoke test. See [architecture](docs/ARCHITECTURE.md).
+
+## Features verified in this repository
+
+- Bounded video upload, metadata validation, source SHA-256, durable single-worker indexing, progress and error reporting.
+- Track records, timestamped boxes, HSV crop embeddings, and video/frame-linked evidence.
+- Track-derived zone changes, motion transitions, approach/departure, placement, pickup, and configurable unattended-object **hypotheses**. The latter three require multi-frame object tracks and must be reviewed against footage; they have been exercised on encoded synthetic video, not independently validated on field footage.
+- Deterministic entity/event/attribute/camera/time filters, TF-IDF ranking, interval joins, transparent signal weights, negative-result coverage, and coarse reference-image search.
+- Source video seek, bounding box overlay, entity timeline with filters and time zoom, stored evidence-backed relationship edges, and reports from collected findings.
+- A 40-query authored-annotation **development fixture**, plus tooling for independent manual labels and paired human timing studies. Neither real-world retrieval accuracy nor time savings has been measured.
+
+## Setup
+
+Requirements: Python 3.12/3.13, Node 20.9+, npm. From the repository root:
 
 ```bash
 ./scripts/dev.sh
 ```
 
-Open **http://localhost:3100**. API documentation: **http://127.0.0.1:8100/docs**.
+Open [localhost:3100](http://localhost:3100/). The API is at [localhost:8100](http://localhost:8100/docs). Generated media, uploads, and SQLite data stay in ignored `data/`. For manual setup, install `backend/requirements.txt` into `.venv`, run `PYTHONPATH=backend .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100`, then `cd frontend && npm ci && npm run dev` in another terminal. Copy `.env.example` to `.env` before customizing backend, tokens, sampling, and the unattended interval. Run one API worker only.
 
-The script creates an isolated Python environment, installs dependencies, starts both services, and creates three deterministic synthetic videos on first launch. No cloud credentials or GPU are needed. Runtime data stays in `data/` and is excluded from Git. The app can ingest real MP4/MOV/AVI/MKV footage separately from its demo.
+For YOLO, install `backend/requirements-models.txt` and set `PERCEPTION_BACKEND=yolo`. HOG remains a people-only CPU fallback. Optional OpenCLIP and EasyOCR require their dependencies and models; they were not verified here. `DEMO_MODE=false` requires a shared API token of at least 24 characters. This prototype has no per-user roles or production privacy controls.
 
-For manual startup:
+## Demo
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
-cd frontend && npm ci && cd ..
-PYTHONPATH=backend .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100
-# In another terminal:
-cd frontend && npm run dev
-```
+Startup includes the original three-camera **authored annotation** fixture for UI and parser regression. It also creates a separate 30-second synthetic MP4 and indexes its decoded pixels with a fixture-specific color-contour detector through the ordinary track/event/evidence pipeline. That second fixture produces placement, unattended, and pickup hypotheses without injecting event labels. Its detector only recognizes the generated colored shapes; it is not a surveillance model. The two fixture types are labeled separately in the evidence viewer. See [demo guide](docs/DEMO.md).
 
-## What works
-
-- Seven responsive screens: command center, ingestion/library, search/results, investigation, evidence graph, and evaluation.
-- Validated streaming uploads, source hashing, persisted async jobs, progress/error reporting, retry, camera/time metadata, and browser-playable video derivatives.
-- Modular YOLO + ByteTrack integration; lightweight pretrained HOG + IoU fallback for CPU-only people detection. Track crops, boxes, observations, events, and evidence are stored transactionally.
-- Event/attribute/camera/location/duration/clock filters, temporal joins, lexical semantic baseline, optional OpenCLIP retrieval, and measured match explanations.
-- Exact video seek, bounding-box overlay, downloadable clips, entity timeline, conservative cross-camera candidates, uncertainty labels, and negative-search coverage.
-- Coarse reference-image search, interactive graph, persistent investigation collections, and Markdown reports.
-- Forty annotated benchmark queries, calculated retrieval metrics, exportable runs, and paired investigation-time measurement.
-- SQLite quickstart; PostgreSQL/pgvector Docker configuration; same-origin API proxy and optional shared-token access control.
-
-## Model modes
-
-The default one-command demo uses the small CPU baseline. Enable the stronger perception adapter for real footage:
-
-```bash
-.venv/bin/pip install -r backend/requirements-models.txt
-# Set these in .env before running scripts/dev.sh:
-# PERCEPTION_BACKEND=yolo
-# YOLO_MODEL=yolo11n.pt
-# ENABLE_CLIP=true      # optional, downloads a vision-language model
-# ENABLE_OCR=true       # optional, downloads OCR models
-```
-
-Copy `.env.example` to `.env` to configure FPS, detection size, database, model adapters, and upload limits. Set `API_TOKEN` in `.env` for protected access. `DEMO_MODE=false` requires at least 24 token characters. Both services must share the token. Outside `scripts/dev.sh`, load the variables into each process explicitly; Python does not automatically read `.env`.
-
-See [model notes](models/README.md) for checkpoint, licensing, capabilities, and limitations. Missing enabled model dependencies fail explicitly instead of fabricating detections. No foundation-model training is required.
-
-## Docker / PostgreSQL
-
-```bash
-docker compose up --build
-```
-
-The database is internal; API and web ports bind to localhost. PostgreSQL starts with pgvector enabled. The API creates the relational schema automatically. Use **one API worker**: this prototype's durable queue is single-process. Docker's default image includes CPU perception; install model extras in a custom image for YOLO/OpenCLIP/OCR. Docker execution should be separately validated on the target host.
-
-## Verify
+## Evaluation
 
 ```bash
 .venv/bin/pytest -q
 cd frontend && npm run typecheck && npm run build
-cd .. && .venv/bin/python scripts/benchmark.py > docs/benchmark-results.json
 ```
 
-Tests exercise actual upload/CPU processing, corrupted input, source linking, retrieval, temporal constraints, empty results, ambiguity, image search, clips, report export, metric calculations, and deterministic detector integration. See [verification record](docs/verification.md) for what was actually run.
+The 40-query lab measures retrieval against authored events only. For a defensible study, annotate at least 30–50 queries from independently reviewed footage with `scripts/evaluate_independent.py`, then record manual and assisted timings with `scripts/timing_study.py`. The independent evaluator refuses fewer than 30 queries unless explicitly run as a small smoke fixture. [Evaluation protocol](docs/EVALUATION.md) explains the labels, metrics, and study controls.
 
-## Evidence honesty
+## Limitations and known unverified components
 
-The included footage is a clearly labeled synthetic reconstruction. Demo events and trajectories are authored annotations, not YOLO output. Baseline text search is TF-IDF with normalized vocabulary; image search is HSV similarity. Cross-camera candidates are appearance hypotheses, never confirmed identities. No face recognition is implemented.
-
-Real-footage placement/pickup/ownership and complex interaction understanding are not production-validated. The CPU fallback is people-only and weak under occlusion. Temporal localization and identity metrics remain unmeasured. The 40-query fixture is a development benchmark, not a held-out dataset; its results must not be advertised as real-world accuracy. See the [technical report and limitations](docs/architecture.md).
-
-## Repository map
-
-```text
-backend/app/     FastAPI, schema, perception, queue, events, retrieval, evidence, evaluation
-frontend/        Next.js / React / TypeScript / Tailwind investigation UI
-models/          Model adapter documentation; optional local weights (ignored)
-scripts/         One-command startup, benchmark runner, schema exporter
-tests/           Backend and integration tests
-data/            Generated media, uploads, derivatives, SQLite (ignored)
-db/              PostgreSQL setup and generated schema
-docs/            Technical report, demo guide, measured benchmark, verification
-```
-
-[Demo guide](docs/demo.md) · [Architecture and evaluation methodology](docs/architecture.md) · [Database schema](db/schema.sql)
-
-**Search retrieves evidence. Reasoning connects evidence. The interface exposes evidence.**
+Field-footage placement/pickup/unattended performance, vehicle entry/exit, continuous identity across cameras, OpenCLIP text-image retrieval, OCR, PostgreSQL/Docker execution, and measured investigation-time reduction remain unverified or incomplete. The current host has no Docker daemon, OpenCLIP, or EasyOCR installed. No reported synthetic metric should be used as a real-world accuracy claim. See [limitations](docs/LIMITATIONS.md), [initial audit](docs/IMPLEMENTATION_AUDIT.md), and [final verification](docs/FINAL_VERIFICATION.md).
