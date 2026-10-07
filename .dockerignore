@@ -1,0 +1,11 @@
+.git
+.venv
+**/node_modules
+**/.next
+data
+models/*.pt
+.env
+.env.local
+**/__pycache__
+.pytest_cache
+frontend/test-results

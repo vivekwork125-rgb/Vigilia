@@ -1,0 +1,43 @@
+name: vigilia
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: vigilia
+      POSTGRES_USER: vigilia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vigilia-local-only}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigilia"]
+      interval: 3s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://vigilia:${POSTGRES_PASSWORD:-vigilia-local-only}@db:5432/vigilia
+      DATA_DIR: /app/data
+      DEMO_MODE: ${DEMO_MODE:-true}
+      API_TOKEN: ${API_TOKEN:-}
+      PERCEPTION_BACKEND: ${PERCEPTION_BACKEND:-hog}
+    volumes:
+      - evidence-data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["127.0.0.1:8100:8100"]
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      BACKEND_URL: http://api:8100
+      API_TOKEN: ${API_TOKEN:-}
+    ports: ["127.0.0.1:3100:3100"]
+    depends_on: [api]
+volumes:
+  postgres-data:
+  evidence-data:

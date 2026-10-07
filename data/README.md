@@ -1,0 +1,1 @@
+Generated synthetic recordings, uploaded originals, thumbnails, clips, and the SQLite database live here at runtime and are ignored by Git. Demo media is generated reproducibly by `backend/app/demo.py` on first startup. No real surveillance footage is included in the repository.

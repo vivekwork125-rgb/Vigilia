@@ -1,0 +1,5 @@
+-r requirements.txt
+ultralytics>=8.3,<9
+lap>=0.5
+open-clip-torch>=2.30,<4
+easyocr>=1.7,<2

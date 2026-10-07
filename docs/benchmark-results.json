@@ -1,0 +1,574 @@
+{
+  "id": "RUN-DC6DEBA9720D",
+  "created_at": "2026-10-07T16:26:09.812816+00:00",
+  "results": {
+    "dataset": "VIGILIA synthetic fixture v1",
+    "scope": "Retrieval against 40 authored queries over synthetic annotations. This is not validation of real-world perception or identity.",
+    "query_count": 40,
+    "positive_queries": 35,
+    "negative_queries": 5,
+    "metrics": {
+      "precision_at_1": 1.0,
+      "precision_at_5": 0.3086,
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "map_at_5": 1.0,
+      "negative_query_false_positive_rate": 0.0,
+      "median_latency_ms": 9.78,
+      "temporal_iou": null,
+      "event_start_error": null,
+      "event_end_error": null,
+      "ambiguous_match_rate": null,
+      "manual_seconds": null,
+      "assisted_seconds": null,
+      "time_reduction": null
+    },
+    "queries": [
+      {
+        "id": "BQ-001",
+        "query": "Find the person who left an object near the east entrance",
+        "case": "placement",
+        "expected": [
+          "EVT-E03"
+        ],
+        "retrieved": [
+          "EVT-E03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 16.02
+      },
+      {
+        "id": "BQ-002",
+        "query": "Show objects placed at the east gate",
+        "case": "placement",
+        "expected": [
+          "EVT-E03"
+        ],
+        "retrieved": [
+          "EVT-E03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.97
+      },
+      {
+        "id": "BQ-003",
+        "query": "Find a red person who placed a bag",
+        "case": "attributes",
+        "expected": [
+          "EVT-E03"
+        ],
+        "retrieved": [
+          "EVT-E03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.82
+      },
+      {
+        "id": "BQ-004",
+        "query": "Find the person carrying backpacks near the east entrance",
+        "case": "carried",
+        "expected": [
+          "EVT-E02"
+        ],
+        "retrieved": [
+          "EVT-E02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.94
+      },
+      {
+        "id": "BQ-005",
+        "query": "Show people carrying a backpack in west plaza",
+        "case": "carried",
+        "expected": [
+          "EVT-W02"
+        ],
+        "retrieved": [
+          "EVT-W02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.8
+      },
+      {
+        "id": "BQ-006",
+        "query": "Find objects left unattended",
+        "case": "uncertainty",
+        "expected": [
+          "EVT-E04"
+        ],
+        "retrieved": [
+          "EVT-E04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.28
+      },
+      {
+        "id": "BQ-007",
+        "query": "Show unattended bags near east entrance",
+        "case": "uncertainty",
+        "expected": [
+          "EVT-E04"
+        ],
+        "retrieved": [
+          "EVT-E04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.08
+      },
+      {
+        "id": "BQ-008",
+        "query": "Find a person who picked up a bag",
+        "case": "uncertainty",
+        "expected": [
+          "EVT-E07"
+        ],
+        "retrieved": [
+          "EVT-E07"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.86
+      },
+      {
+        "id": "BQ-009",
+        "query": "Show blue people who picked up the backpack",
+        "case": "attributes",
+        "expected": [
+          "EVT-E07"
+        ],
+        "retrieved": [
+          "EVT-E07"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.6
+      },
+      {
+        "id": "BQ-010",
+        "query": "Find red people entering east entrance",
+        "case": "similar appearance",
+        "expected": [
+          "EVT-E01",
+          "EVT-E08"
+        ],
+        "retrieved": [
+          "EVT-E01",
+          "EVT-E08"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.76
+      },
+      {
+        "id": "BQ-011",
+        "query": "Find blue people entering east entrance",
+        "case": "attributes",
+        "expected": [
+          "EVT-E06"
+        ],
+        "retrieved": [
+          "EVT-E06"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.64
+      },
+      {
+        "id": "BQ-012",
+        "query": "Find people who entered west plaza",
+        "case": "zones",
+        "expected": [
+          "EVT-W01",
+          "EVT-W04",
+          "EVT-W06"
+        ],
+        "retrieved": [
+          "EVT-W01",
+          "EVT-W06",
+          "EVT-W04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.94
+      },
+      {
+        "id": "BQ-013",
+        "query": "Find red people who entered west plaza",
+        "case": "similar appearance",
+        "expected": [
+          "EVT-W01",
+          "EVT-W04"
+        ],
+        "retrieved": [
+          "EVT-W01",
+          "EVT-W04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.95
+      },
+      {
+        "id": "BQ-014",
+        "query": "Find blue people entering west plaza",
+        "case": "attributes",
+        "expected": [
+          "EVT-W06"
+        ],
+        "retrieved": [
+          "EVT-W06"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.49
+      },
+      {
+        "id": "BQ-015",
+        "query": "Find people who entered parking",
+        "case": "low light",
+        "expected": [
+          "EVT-C02",
+          "EVT-C05"
+        ],
+        "retrieved": [
+          "EVT-C05",
+          "EVT-C02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.1
+      },
+      {
+        "id": "BQ-016",
+        "query": "Find red people entering parking",
+        "case": "low light",
+        "expected": [
+          "EVT-C02"
+        ],
+        "retrieved": [
+          "EVT-C02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.14
+      },
+      {
+        "id": "BQ-017",
+        "query": "Show blue people entering parking",
+        "case": "low light",
+        "expected": [
+          "EVT-C05"
+        ],
+        "retrieved": [
+          "EVT-C05"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.38
+      },
+      {
+        "id": "BQ-018",
+        "query": "Show white vehicles stopped in parking",
+        "case": "duration",
+        "expected": [
+          "EVT-C01"
+        ],
+        "retrieved": [
+          "EVT-C01"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.18
+      },
+      {
+        "id": "BQ-019",
+        "query": "Show vehicles stopped for more than 20 seconds",
+        "case": "duration",
+        "expected": [
+          "EVT-C01"
+        ],
+        "retrieved": [
+          "EVT-C01"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.42
+      },
+      {
+        "id": "BQ-020",
+        "query": "Find vehicles that stopped for more than two minutes",
+        "case": "negative duration",
+        "expected": [],
+        "retrieved": [],
+        "correct_top1": true,
+        "latency_ms": 10.57
+      },
+      {
+        "id": "BQ-021",
+        "query": "Find the person who approached a vehicle",
+        "case": "interaction",
+        "expected": [
+          "EVT-C03"
+        ],
+        "retrieved": [
+          "EVT-C03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.91
+      },
+      {
+        "id": "BQ-022",
+        "query": "Find red people who approached a car in parking",
+        "case": "interaction",
+        "expected": [
+          "EVT-C03"
+        ],
+        "retrieved": [
+          "EVT-C03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.47
+      },
+      {
+        "id": "BQ-023",
+        "query": "Find vehicles that exited parking",
+        "case": "exit",
+        "expected": [
+          "EVT-C04"
+        ],
+        "retrieved": [
+          "EVT-C04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.83
+      },
+      {
+        "id": "BQ-024",
+        "query": "Find red people who exited east entrance",
+        "case": "similar appearance",
+        "expected": [
+          "EVT-E05",
+          "EVT-E09"
+        ],
+        "retrieved": [
+          "EVT-E05",
+          "EVT-E09"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.72
+      },
+      {
+        "id": "BQ-025",
+        "query": "Show blue people who exited west plaza",
+        "case": "exit",
+        "expected": [
+          "EVT-W07"
+        ],
+        "retrieved": [
+          "EVT-W07"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.66
+      },
+      {
+        "id": "BQ-026",
+        "query": "Find people who left the scene at west plaza",
+        "case": "occlusion",
+        "expected": [
+          "EVT-W03",
+          "EVT-W05",
+          "EVT-W07"
+        ],
+        "retrieved": [
+          "EVT-W07",
+          "EVT-W03",
+          "EVT-W05"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.7
+      },
+      {
+        "id": "BQ-027",
+        "query": "Find people entering Camera 1",
+        "case": "camera",
+        "expected": [
+          "EVT-E01",
+          "EVT-E06",
+          "EVT-E08"
+        ],
+        "retrieved": [
+          "EVT-E01",
+          "EVT-E06",
+          "EVT-E08"
+        ],
+        "correct_top1": true,
+        "latency_ms": 5.14
+      },
+      {
+        "id": "BQ-028",
+        "query": "Find people entering Camera 2",
+        "case": "camera",
+        "expected": [
+          "EVT-W01",
+          "EVT-W04",
+          "EVT-W06"
+        ],
+        "retrieved": [
+          "EVT-W01",
+          "EVT-W06",
+          "EVT-W04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 3.57
+      },
+      {
+        "id": "BQ-029",
+        "query": "Find people entering Camera 3",
+        "case": "camera",
+        "expected": [
+          "EVT-C02",
+          "EVT-C05"
+        ],
+        "retrieved": [
+          "EVT-C05",
+          "EVT-C02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 3.17
+      },
+      {
+        "id": "BQ-030",
+        "query": "Find red people entering after 6:03 PM",
+        "case": "time",
+        "expected": [
+          "EVT-C02",
+          "EVT-E01",
+          "EVT-E08"
+        ],
+        "retrieved": [
+          "EVT-E01",
+          "EVT-E08",
+          "EVT-C02"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.73
+      },
+      {
+        "id": "BQ-031",
+        "query": "Find people entering before 6:01 PM",
+        "case": "time",
+        "expected": [
+          "EVT-W01",
+          "EVT-W04",
+          "EVT-W06"
+        ],
+        "retrieved": [
+          "EVT-W01",
+          "EVT-W06",
+          "EVT-W04"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.63
+      },
+      {
+        "id": "BQ-032",
+        "query": "Find people entering between 6:04 PM and 6:05 PM",
+        "case": "time",
+        "expected": [
+          "EVT-E01",
+          "EVT-E06",
+          "EVT-E08"
+        ],
+        "retrieved": [
+          "EVT-E01",
+          "EVT-E06",
+          "EVT-E08"
+        ],
+        "correct_top1": true,
+        "latency_ms": 9.5
+      },
+      {
+        "id": "BQ-033",
+        "query": "Find people who approached a vehicle within two minutes before it left",
+        "case": "temporal relation",
+        "expected": [
+          "EVT-C03"
+        ],
+        "retrieved": [
+          "EVT-C03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 10.05
+      },
+      {
+        "id": "BQ-034",
+        "query": "Show a yellow bus",
+        "case": "negative object",
+        "expected": [],
+        "retrieved": [],
+        "correct_top1": true,
+        "latency_ms": 9.86
+      },
+      {
+        "id": "BQ-035",
+        "query": "Find people at Camera 5 between 7 and 8 PM",
+        "case": "camera gap",
+        "expected": [],
+        "retrieved": [],
+        "correct_top1": true,
+        "latency_ms": 0.3
+      },
+      {
+        "id": "BQ-036",
+        "query": "Find people wearing purple",
+        "case": "negative color",
+        "expected": [],
+        "retrieved": [],
+        "correct_top1": true,
+        "latency_ms": 9.34
+      },
+      {
+        "id": "BQ-037",
+        "query": "Find bicycles entering the entrance",
+        "case": "negative object",
+        "expected": [],
+        "retrieved": [],
+        "correct_top1": true,
+        "latency_ms": 9.29
+      },
+      {
+        "id": "BQ-038",
+        "query": "Show objects placed before 6:05 PM",
+        "case": "time",
+        "expected": [
+          "EVT-E03"
+        ],
+        "retrieved": [
+          "EVT-E03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 29.61
+      },
+      {
+        "id": "BQ-039",
+        "query": "Find a backpack placed at Camera 1",
+        "case": "objects",
+        "expected": [
+          "EVT-E03"
+        ],
+        "retrieved": [
+          "EVT-E03"
+        ],
+        "correct_top1": true,
+        "latency_ms": 4.64
+      },
+      {
+        "id": "BQ-040",
+        "query": "Show cars stopped at Camera 3",
+        "case": "camera",
+        "expected": [
+          "EVT-C01"
+        ],
+        "retrieved": [
+          "EVT-C01"
+        ],
+        "correct_top1": true,
+        "latency_ms": 3.02
+      }
+    ],
+    "timing_pairs": [],
+    "limitations": [
+      "P@5 uses a fixed denominator of five; relevant sets may contain fewer items.",
+      "Temporal localization is unmeasured: independent model predictions and interval labels are required.",
+      "Association accuracy is unmeasured; similar-looking entities are deliberately ambiguous.",
+      "Time reduction is calculated only after paired manual and assisted timings are submitted."
+    ]
+  }
+}
