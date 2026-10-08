@@ -1,5 +1,9 @@
 # VIGILIA — MEVA failure analysis and accuracy pass
 
+The subsequent [vehicle state reasoning experiment](MEVA_VEHICLE_REASONING_REPORT.md) and [selective small-object experiment](MEVA_SMALL_OBJECT_REPORT.md) analyze the frozen `ba838cf` run without changing production perception, temporal rules, or independent matching. Their diagnostic counts are separate from this historical full-benchmark result.
+
+The vehicle experiments found no rule that improved the eight matched DIRECT activities; a fresh eight-video run reproduced 8/89 matches, 47.06% precision, 8.99% recall and 0.5976 mean matched temporal IoU, with 2,443/2,443 source-linked predictions. Person-triggered object crops increased broad object-class overlaps, but no portable-class track overlapped any of the 30 manipulation labels. Pickup and placement remain 0/15 each. The production YOLO11n 640/.30, 2 FPS, ByteTrack configuration and conservative event rules therefore remain in place.
+
 For the subsequent controlled detector-size, confidence, stronger-model, tracking, and object-crop comparison, see the [MEVA perception report](MEVA_PERCEPTION_REPORT.md). This historical report and its 2 FPS run remain the frozen baseline for that experiment.
 
 This report compares the frozen commit 7ccb717 run with a new full eight-video run on the same MEVA sources, YOLO11n weights, ByteTrack, 2 FPS sampling, 640-pixel detector size, 0.3 confidence threshold and unchanged independent matching rule. This selected set is not a held-out generalization test. Detection accuracy remains poor despite a meaningful reduction in unsupported motion hypotheses.
