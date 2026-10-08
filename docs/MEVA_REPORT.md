@@ -1,5 +1,7 @@
 # VIGILIA — MEVA failure analysis and accuracy pass
 
+For the subsequent controlled detector-size, confidence, stronger-model, tracking, and object-crop comparison, see the [MEVA perception report](MEVA_PERCEPTION_REPORT.md). This historical report and its 2 FPS run remain the frozen baseline for that experiment.
+
 This report compares the frozen commit 7ccb717 run with a new full eight-video run on the same MEVA sources, YOLO11n weights, ByteTrack, 2 FPS sampling, 640-pixel detector size, 0.3 confidence threshold and unchanged independent matching rule. This selected set is not a held-out generalization test. Detection accuracy remains poor despite a meaningful reduction in unsupported motion hypotheses.
 
 ## Dataset and reproducibility
