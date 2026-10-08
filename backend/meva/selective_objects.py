@@ -41,6 +41,10 @@ def person_roi(box, width, height, strategy="expanded", factor=1.5):
     elif strategy == "interaction":
         w *= 1.4
         h *= 0.9
+    elif strategy in ("scene_nearby", "scene"):
+        w *= 1.8
+        h *= 1.4
+        cy += 0.1 * (y2 - y1)
     elif strategy != "expanded":
         raise ValueError(strategy)
     return (

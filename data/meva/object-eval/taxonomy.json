@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "description": "Evaluation-only object taxonomy for MEVA small-object manipulation activities.",
+  "principles": [
+    "Do NOT force a semantic class onto MEVA generic 'other' without evidence.",
+    "KNOWN_SUPPORTED requires confirmed presence of production portable classes (backpack, handbag, suitcase, bag, briefcase, bottle).",
+    "KNOWN_UNSUPPORTED requires confirmed presence of non-supported semantic classes.",
+    "AMBIGUOUS indicates visible item with class ambiguity or hand occlusion.",
+    "UNKNOWN indicates low-contrast, silhouette, window glare, or distant pixels where identity is completely undetermined."
+  ],
+  "total_cases": 30,
+  "category_distribution": {
+    "KNOWN_SUPPORTED": 0,
+    "KNOWN_UNSUPPORTED": 0,
+    "AMBIGUOUS": 16,
+    "UNKNOWN": 14
+  },
+  "size_summary": {
+    "cases_under_40px_width": 21,
+    "median_width_px": 26.0,
+    "median_height_px": 38.0
+  }
+}
