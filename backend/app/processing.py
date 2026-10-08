@@ -3,6 +3,7 @@
 import logging
 import os
 import threading
+import time
 from collections import defaultdict
 import cv2
 import numpy as np
@@ -21,7 +22,7 @@ from .db import (
 )
 from .evidence import create_event
 from .vision import detector, dominant_color, appearance, ClipEncoder
-from .temporal_events import track_events
+from .temporal_events import continuous_tracks, track_events
 
 log = logging.getLogger("vigilia.worker")
 stop = threading.Event()
@@ -37,32 +38,17 @@ def progress(video_id, state, value):
 
 
 def extract_events(samples, duration):
-    """Per-track scene boundary and stationary transitions."""
+    """Per-track appearance/disappearance. Motion rules have one canonical engine."""
     result = [("appeared", samples[0]["t"], samples[0]["t"], "OBSERVED")]
     if samples[-1]["t"] < duration - 2 / SAMPLE_FPS:
         result.append(("disappeared", samples[-1]["t"], samples[-1]["t"], "INFERRED"))
-    stationary_start = None
-    for a, b in zip(samples, samples[1:]):
-        center_a = np.array(
-            [(a["box"][0] + a["box"][2]) / 2, (a["box"][1] + a["box"][3]) / 2]
-        )
-        center_b = np.array(
-            [(b["box"][0] + b["box"][2]) / 2, (b["box"][1] + b["box"][3]) / 2]
-        )
-        scale = max(1, a["box"][3] - a["box"][1])
-        speed = np.linalg.norm(center_b - center_a) / scale / max(0.01, b["t"] - a["t"])
-        if speed < 0.08:
-            stationary_start = a["t"] if stationary_start is None else stationary_start
-        elif stationary_start is not None:
-            if a["t"] - stationary_start >= 3:
-                result.append(("stopped", stationary_start, a["t"], "INFERRED"))
-            stationary_start = None
-    if stationary_start is not None and samples[-1]["t"] - stationary_start >= 3:
-        result.append(("stopped", stationary_start, samples[-1]["t"], "INFERRED"))
     return result
 
 
 def process(video_id, model_override=None):
+    begun = time.perf_counter()
+    decode_seconds = detector_tracking_seconds = 0.0
+    sampled_frames = 0
     with session() as s:
         video = s.get(Video, video_id)
         if not video:
@@ -93,7 +79,9 @@ def process(video_id, model_override=None):
     scene = 0
     try:
         while not stop.is_set():
+            tick = time.perf_counter()
             ok, frame = cap.read()
+            decode_seconds += time.perf_counter() - tick
             if not ok:
                 break
             if frame_idx % step == 0:
@@ -109,7 +97,11 @@ def process(video_id, model_override=None):
                 elif previous is None:
                     scene = 0
                 previous = gray.astype(float)
-                for item in model.detect(frame):
+                tick = time.perf_counter()
+                detections = model.detect(frame)
+                detector_tracking_seconds += time.perf_counter() - tick
+                sampled_frames += 1
+                for item in detections:
                     key = f"{scene}-{item['track_id']}"
                     x1, y1, x2, y2 = item["box"]
                     x1, y1 = max(0, x1), max(0, y1)
@@ -137,6 +129,8 @@ def process(video_id, model_override=None):
     finally:
         cap.release()
     progress(video_id, "indexing", 90)
+    tracks = continuous_tracks(tracks, max_gap=max(1.5, 3 / SAMPLE_FPS))
+    indexing_start = time.perf_counter()
     with session() as s:
         video = s.get(Video, video_id)
         camera = s.get(Camera, video.camera_id)
@@ -144,7 +138,7 @@ def process(video_id, model_override=None):
         for key, samples in tracks.items():
             if len(samples) < 2:
                 continue
-            crop = crops[key]
+            crop = crops[key.split("@")[0]]
             # Upper-half color is a measured coarse cue, not a verified clothing label.
             color = dominant_color(crop[: max(1, crop.shape[0] // 2)])
             typ = samples[0]["object_type"]
@@ -222,14 +216,15 @@ def process(video_id, model_override=None):
                     method=model.name + " + geometric rules",
                 )
         # Every interaction is derived from the same detector/tracker samples.
-        for candidate in track_events(
+        tick = time.perf_counter()
+        candidates = track_events(
             tracks,
             video.width,
             video.height,
             zones=camera.connections.get("zones", []),
-        ):
-            if candidate.kind == "stopped":
-                continue  # Already emitted by the backward-compatible per-track rule.
+        )
+        event_extraction_seconds = time.perf_counter() - tick
+        for candidate in candidates:
             primary = track_entities.get(candidate.keys[0])
             if primary is None:
                 continue
@@ -289,6 +284,22 @@ def process(video_id, model_override=None):
         video.pipeline = model.name
         video.error = None
     log.info("Indexed %s with %d tracks", video_id, len(track_entities))
+    wall = time.perf_counter() - begun
+    return {
+        "video_id": video_id,
+        "video_duration_seconds": duration,
+        "wall_seconds": wall,
+        "decoded_frames": frame_idx,
+        "sampled_frames": sampled_frames,
+        "processing_fps": frame_idx / wall,
+        "sampled_processing_fps": sampled_frames / wall,
+        "decode_seconds": decode_seconds,
+        "detector_and_tracker_seconds": detector_tracking_seconds,
+        "event_extraction_seconds": event_extraction_seconds,
+        "indexing_seconds_including_event_extraction": time.perf_counter()
+        - indexing_start,
+        "tracks": len(track_entities),
+    }
 
 
 def worker_loop():

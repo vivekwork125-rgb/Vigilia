@@ -69,6 +69,192 @@ def separation(a, b, scale):
     return hypot(x2 - x1, y2 - y1) / max(1, scale)
 
 
+def continuous_tracks(tracks, max_gap=1.5):
+    """A detection gap is unknown coverage, never evidence of continuous motion."""
+    output = {}
+    for key, samples in tracks.items():
+        groups = [[]]
+        for item in samples:
+            if groups[-1] and item["t"] - groups[-1][-1]["t"] > max_gap:
+                groups.append([])
+            groups[-1].append(item)
+        for index, group in enumerate(groups):
+            if group:
+                output[key if len(groups) == 1 else f"{key}@{index}"] = group
+    return output
+
+
+def coupling(person, obj, start, end):
+    """Common pixel-coordinate motion vectors, proximity and sustained displacement.
+
+    Comparing speeds normalized by different box heights can assign the wrong
+    person. Direction and relative vector agreement must both support coupling.
+    """
+    pairs = [(a, b) for a, b in aligned(person, obj) if start <= a["t"] <= end]
+    good, residuals, distances = 0, [], []
+    for (a, b), (c, d) in pairwise(pairs):
+        if c["t"] - a["t"] > 1.5:
+            continue
+        scale = max(1, a["box"][3] - a["box"][1])
+        ax, ay = center(a)
+        bx, by = center(b)
+        cx, cy = center(c)
+        dx, dy = center(d)
+        pv, ov = (cx - ax, cy - ay), (dx - bx, dy - by)
+        pn, on = hypot(*pv), hypot(*ov)
+        residual = hypot(pv[0] - ov[0], pv[1] - ov[1]) / max(pn, on, 1)
+        cosine = (pv[0] * ov[0] + pv[1] * ov[1]) / max(pn * on, 1e-9)
+        distance = separation(c, d, scale)
+        if (
+            pn >= 2
+            and on >= 2
+            and cosine >= 0.8
+            and residual <= 0.35
+            and distance <= 1.5
+        ):
+            good += 1
+            residuals.append(residual)
+            distances.append(distance)
+    if good < 2 or not pairs:
+        return None
+    displacement = hypot(
+        center(pairs[-1][1])[0] - center(pairs[0][1])[0],
+        center(pairs[-1][1])[1] - center(pairs[0][1])[1],
+    )
+    person_height = max(1, pairs[0][0]["box"][3] - pairs[0][0]["box"][1])
+    if displacement < max(4, 0.2 * person_height):
+        return None
+    return sum(residuals) / good + 0.1 * sum(distances) / good
+
+
+def object_interactions(tracks, persons, unattended_seconds):
+    """Resolve one person-object hypothesis per transition; ambiguous ties abstain."""
+    output = []
+    for object_key, obj in tracks.items():
+        if obj[0]["object_type"] not in PORTABLE:
+            continue
+        scale = max(1, obj[0]["box"][3] - obj[0]["box"][1])
+        motion = moving(obj, scale, threshold=0.25)
+        for start, end in intervals(motion, obj, False):
+            if end - start < 2:
+                continue
+            for kind, window in (
+                ("picked_up", (end, end + 3)),
+                ("placed_object", (start - 3, start)),
+            ):
+                candidates = []
+                for person_key, person in persons.items():
+                    quality = coupling(person, obj, *window)
+                    if quality is None:
+                        continue
+                    person_scale = max(1, person[0]["box"][3] - person[0]["box"][1])
+                    distances = [
+                        (a["t"], separation(a, b, person_scale))
+                        for a, b in aligned(person, obj)
+                    ]
+                    if kind == "picked_up":
+                        prior_near = [
+                            (t, d)
+                            for t, d in distances
+                            if end - 2 <= t <= end and d <= 1.5
+                        ]
+                        after = [
+                            (t, d)
+                            for t, d in distances
+                            if end < t <= end + 3 and d <= 1.5
+                        ]
+                        # Contact-region proximity before movement followed by consistent coupled motion.
+                        if prior_near and len(after) >= 2:
+                            candidates.append(
+                                (quality, person_key, after[-1][0], distances)
+                            )
+                    else:
+                        close = [
+                            (t, d)
+                            for t, d in distances
+                            if start <= t <= start + 2 and d <= 1.5
+                        ]
+                        separated = [
+                            (t, d)
+                            for t, d in distances
+                            if close and close[0][0] < t <= end and d >= 2.2
+                        ]
+                        if not separated:
+                            continue
+                        left = separated[0][0]
+                        sustained = [
+                            (t, d)
+                            for t, d in distances
+                            if left <= t <= min(end, left + 2)
+                        ]
+                        if (
+                            sustained
+                            and sustained[-1][0] - left >= 2
+                            and all(d >= 2.2 for _, d in sustained)
+                        ):
+                            candidates.append((quality, person_key, left, distances))
+                candidates.sort(key=lambda item: item[0])
+                if not candidates or (
+                    len(candidates) > 1 and candidates[1][0] - candidates[0][0] < 0.05
+                ):
+                    continue
+                quality, person_key, finish, distances = candidates[0]
+                output.append(
+                    Candidate(
+                        kind,
+                        (person_key, object_key),
+                        end if kind == "picked_up" else start,
+                        finish,
+                        attributes={
+                            "association": "uncertain coupled-motion hypothesis; proximity does not prove possession",
+                            "coupling_residual_score": round(quality, 4),
+                        },
+                    )
+                )
+            # Visible stationary object, sustained departure and continuous absence of nearby-person evidence.
+            departures = []
+            for person_key, person in persons.items():
+                person_scale = max(1, person[0]["box"][3] - person[0]["box"][1])
+                distances = [
+                    (a["t"], separation(a, b, person_scale))
+                    for a, b in aligned(person, obj)
+                    if start <= a["t"] <= end
+                ]
+                near = [t for t, d in distances if d <= 1.5]
+                if not near:
+                    continue
+                left = next((t for t, d in distances if t > near[0] and d >= 2.2), None)
+                if left is None:
+                    continue
+                returned = next((t for t, d in distances if t > left and d <= 1.5), end)
+                if returned - left >= unattended_seconds:
+                    departures.append((left, returned, person_key))
+            for left, finish, person_key in sorted(departures):
+                nearby = any(
+                    left <= a["t"] <= finish
+                    and separation(a, b, max(1, b["box"][3] - b["box"][1])) <= 1.5
+                    for key, person in persons.items()
+                    if key != person_key
+                    for a, b in aligned(obj, person)
+                )
+                if not nearby:
+                    output.append(
+                        Candidate(
+                            "unattended",
+                            (object_key, person_key),
+                            left,
+                            finish,
+                            attributes={
+                                "person_left_at": left,
+                                "unattended_seconds": round(finish - left, 2),
+                                "association": "visible-camera hypothesis only; absence and ownership not established",
+                            },
+                        )
+                    )
+                    break
+    return output
+
+
 def track_events(tracks, width, height, zones=(), unattended_seconds=None):
     """Extract repeatable hypotheses from actual sampled tracks.
 
@@ -83,26 +269,53 @@ def track_events(tracks, width, height, zones=(), unattended_seconds=None):
     if unattended_seconds <= 0:
         raise ValueError("UNATTENDED_SECONDS must be positive")
     out = []
+    tracks = continuous_tracks(
+        tracks, max_gap=max(1.5, 3 / float(os.getenv("SAMPLE_FPS", "2")))
+    )
     valid = {key: samples for key, samples in tracks.items() if len(samples) >= 3}
     for key, samples in valid.items():
         typ = samples[0]["object_type"]
         scale = max(1, samples[0]["box"][3] - samples[0]["box"][1])
         motion = moving(samples, scale)
-        for start, end in intervals(motion, samples, False):
+        stationary = list(intervals(motion, samples, False))
+        movements = list(intervals(motion, samples, True))
+        for start, end in stationary:
             if end - start >= 2:
+                prior_motion = any(b == start and b - a >= 1 for a, b in movements)
+                kind = (
+                    ("stopped" if typ in VEHICLES | {"person"} else "became_stationary")
+                    if prior_motion
+                    else "stationary"
+                )
+                output_end = min(end, start + 2) if prior_motion else end
                 out.append(
                     Candidate(
-                        "stopped"
-                        if typ in VEHICLES | {"person"}
-                        else "became_stationary",
+                        kind,
                         (key,),
                         start,
-                        end,
+                        output_end,
+                        attributes={
+                            "state_verified_until": end,
+                            "prior_motion_observed": prior_motion,
+                        },
                     )
                 )
-        for start, end in intervals(motion, samples, True):
-            if end - start >= 1 and start > samples[0]["t"]:
-                out.append(Candidate("started_moving", (key,), start, end))
+        for start, end in movements:
+            if end - start >= 1 and any(
+                b == start and b - a >= 2 for a, b in stationary
+            ):
+                out.append(
+                    Candidate(
+                        "started_moving",
+                        (key,),
+                        start,
+                        min(end, start + 1),
+                        attributes={
+                            "motion_verified_until": end,
+                            "prior_stationary_observed": True,
+                        },
+                    )
+                )
         for zone in zones:
             rect = zone.get("rect", ())
             if len(rect) != 4:
@@ -189,113 +402,7 @@ def track_events(tracks, width, height, zones=(), unattended_seconds=None):
                         distances[-1][0],
                     )
                 )
-            if typ in PORTABLE:
-                # Require an observed object motion phase, a sustained stationary
-                # phase, proximity, then separation. A newly appearing static bag
-                # cannot by itself establish placement or pickup.
-                obj_scale = max(1, obj[0]["box"][3] - obj[0]["box"][1])
-                object_moves = moving(obj, obj_scale, threshold=0.15)
-                for start, end in intervals(object_moves, obj, False):
-                    if end - start < 2:
-                        continue
-                    before = [(t, d) for t, d in distances if start - 3 <= t < start]
-                    close_at_start = [
-                        (t, d)
-                        for t, d in distances
-                        if start <= t <= start + 2 and d <= 1.5
-                    ]
-                    far_after = [
-                        (t, d)
-                        for t, d in distances
-                        if close_at_start
-                        and close_at_start[0][0] < t <= end
-                        and d >= 2.2
-                    ]
-                    moving_before = any(
-                        obj[i]["t"] < start and obj[i]["t"] >= start - 3 and state
-                        for i, state in enumerate(object_moves)
-                    )
-                    moving_after = any(
-                        obj[i]["t"] >= end and obj[i]["t"] <= end + 3 and state
-                        for i, state in enumerate(object_moves)
-                    )
-                    if (
-                        moving_before
-                        and before
-                        and min(d for _, d in before) <= 1.5
-                        and far_after
-                    ):
-                        out.append(
-                            Candidate(
-                                "placed_object",
-                                (person_key, other_key),
-                                start,
-                                far_after[0][0],
-                                attributes={
-                                    "association": "spatial-temporal hypothesis"
-                                },
-                            )
-                        )
-                    close_at_end = [
-                        (t, d)
-                        for t, d in distances
-                        if end - 2 <= t <= end + 2 and d <= 1.5
-                    ]
-                    co_moving = [
-                        (t, d) for t, d in distances if end < t <= end + 3 and d <= 1.5
-                    ]
-                    if moving_after and close_at_end and len(co_moving) >= 2:
-                        out.append(
-                            Candidate(
-                                "picked_up",
-                                (person_key, other_key),
-                                end,
-                                co_moving[-1][0],
-                                attributes={
-                                    "association": "spatial-temporal hypothesis"
-                                },
-                            )
-                        )
-                    # A visible stationary object with a person moving away is an
-                    # unattended *hypothesis*, ending when that person returns.
-                    if far_after:
-                        left_at = far_after[0][0]
-                        returned = next(
-                            (
-                                t
-                                for t, d in distances
-                                if left_at < t <= end and d <= 1.5
-                            ),
-                            None,
-                        )
-                        unattended_end = returned if returned is not None else end
-                        another_person_near = any(
-                            left_at <= bag_sample["t"] <= unattended_end
-                            and separation(bag_sample, other_sample, person_scale)
-                            <= 1.5
-                            for other_person_key, other_person in persons.items()
-                            if other_person_key != person_key
-                            for bag_sample, other_sample in aligned(obj, other_person)
-                        )
-                        if (
-                            unattended_end - left_at >= unattended_seconds
-                            and not another_person_near
-                        ):
-                            out.append(
-                                Candidate(
-                                    "unattended",
-                                    (other_key, person_key),
-                                    left_at,
-                                    unattended_end,
-                                    attributes={
-                                        "person_left_at": left_at,
-                                        "unattended_seconds": round(
-                                            unattended_end - left_at, 2
-                                        ),
-                                        "association": "uncertain; proximity does not prove ownership",
-                                    },
-                                )
-                            )
+    out.extend(object_interactions(valid, persons, unattended_seconds))
     # Prevent repeated hypotheses from multiple runs sharing exact source interval.
     unique = {}
     for event in out:

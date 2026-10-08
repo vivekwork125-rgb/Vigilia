@@ -64,7 +64,7 @@ class YoloDetector:
             persist=True,
             tracker="bytetrack.yaml",
             imgsz=int(os.getenv("DETECTION_SIZE", "640")),
-            conf=0.3,
+            conf=float(os.getenv("DETECTION_CONFIDENCE", "0.3")),
             verbose=False,
         )[0]
         if result.boxes is None or result.boxes.id is None:

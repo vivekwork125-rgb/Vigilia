@@ -14,16 +14,16 @@ VIGILIA ingests source video, records its hash and camera time, samples frames, 
 
 ## Architecture and technology stack
 
-Next.js 16/React/TypeScript provides the workspace and same-origin API proxy. FastAPI, SQLAlchemy, OpenCV, and scikit-learn implement ingestion, processing, evidence, and retrieval. SQLite is the verified local database. A PostgreSQL/pgvector Compose configuration exists but could not be run on the current host. The local CPU baseline is OpenCV HOG for people; YOLO11n + ByteTrack is an optional model adapter with a limited integration smoke test. See [architecture](docs/ARCHITECTURE.md).
+Next.js 16/React/TypeScript provides the workspace and same-origin API proxy. FastAPI, SQLAlchemy, OpenCV, and scikit-learn implement ingestion, processing, evidence, and retrieval. SQLite is the verified local database. A PostgreSQL/pgvector Compose configuration exists but could not be run on the current host. YOLO11n + ByteTrack is the real MEVA benchmark baseline; HOG remains a people-only development fallback. See [architecture](docs/ARCHITECTURE.md).
 
 ## Features verified in this repository
 
 - Bounded video upload, metadata validation, source SHA-256, durable single-worker indexing, progress and error reporting.
 - Track records, timestamped boxes, HSV crop embeddings, and video/frame-linked evidence.
-- Track-derived zone changes, motion transitions, approach/departure, placement, pickup, and configurable unattended-object **hypotheses**. The latter three require multi-frame object tracks and must be reviewed against footage; they have been exercised on encoded synthetic video, not independently validated on field footage.
+- Track-derived zone changes, motion transitions, approach/departure, placement, pickup, and configurable unattended-object **hypotheses**. These require continuous multi-frame evidence and uncertain associations; they do not establish possession or intent. Real MEVA evaluation exposes weak action detection, including missed pickups and placements.
 - Deterministic entity/event/attribute/camera/time filters, TF-IDF ranking, interval joins, transparent signal weights, negative-result coverage, and coarse reference-image search.
 - Source video seek, bounding box overlay, entity timeline with filters and time zoom, stored evidence-backed relationship edges, and reports from collected findings.
-- A 40-query authored-annotation **development fixture**, plus tooling for independent manual labels and paired human timing studies. Neither real-world retrieval accuracy nor time savings has been measured.
+- A 40-query authored-annotation **development fixture**, a separate real MEVA benchmark with 104 camera/query checks, independent manual-label tooling, and paired human timing tools. MEVA metrics and errors are reported honestly; investigation-time savings remain unmeasured.
 
 ## Setup
 
@@ -50,6 +50,14 @@ cd frontend && npm run typecheck && npm run build
 
 The 40-query lab measures retrieval against authored events only. For a defensible study, annotate at least 30–50 queries from independently reviewed footage with `scripts/evaluate_independent.py`, then record manual and assisted timings with `scripts/timing_study.py`. The independent evaluator refuses fewer than 30 queries unless explicitly run as a small smoke fixture. [Evaluation protocol](docs/EVALUATION.md) explains the labels, metrics, and study controls.
 
+The separate [MEVA benchmark](docs/MEVA.md) validates eight real videos against external activity annotations. Ground truth never enters production event generation. With the dataset already downloaded and YOLO weights installed:
+
+```bash
+MEVA_ROOT=~/VIGILIA_DATA .venv/bin/python scripts/run_meva.py --run-dir data/meva/reproduction
+```
+
+See the [measured results and limitations](docs/MEVA_REPORT.md), [portable manifest](datasets/meva/manifest.json), and [activity mappings](docs/MEVA_MAPPING.md). Raw MEVA footage stays outside Git. MEVA by Kitware Inc. and IARPA is licensed CC-BY-4.0; references and attribution are in the benchmark documentation.
+
 ## Limitations and known unverified components
 
-Field-footage placement/pickup/unattended performance, vehicle entry/exit, continuous identity across cameras, OpenCLIP text-image retrieval, OCR, PostgreSQL/Docker execution, and measured investigation-time reduction remain unverified or incomplete. The current host has no Docker daemon, OpenCLIP, or EasyOCR installed. No reported synthetic metric should be used as a real-world accuracy claim. See [limitations](docs/LIMITATIONS.md), [initial audit](docs/IMPLEMENTATION_AUDIT.md), and [final verification](docs/FINAL_VERIFICATION.md).
+Real MEVA action detection is weak; missed pickup/placement examples are retained. Unattended relevance has no compatible MEVA ground-truth activity. Vehicle entry/exit, continuous identity across cameras, OpenCLIP text-image retrieval, OCR, PostgreSQL/Docker execution, and measured investigation-time reduction remain unverified or incomplete. The current host has no Docker daemon, OpenCLIP, or EasyOCR installed. No synthetic metric should be used as a real-world accuracy claim. See [limitations](docs/LIMITATIONS.md), [initial audit](docs/IMPLEMENTATION_AUDIT.md), [earlier verification](docs/FINAL_VERIFICATION.md), and the current [MEVA report](docs/MEVA_REPORT.md).

@@ -1,0 +1,91 @@
+{
+  "source_video_id": "MEVA-G424-20180315-1555",
+  "attribution": "MEVA, Kitware Inc. and IARPA, CC-BY-4.0",
+  "scope": "Seven baseline detector boxes only; no activity labels",
+  "samples": [
+    {
+      "frame": 0,
+      "t": 0.0,
+      "box": [
+        750,
+        822,
+        1200,
+        1069
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 315,
+      "t": 10.5,
+      "box": [
+        754,
+        826,
+        1196,
+        1067
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 330,
+      "t": 11.0,
+      "box": [
+        754,
+        826,
+        1197,
+        1067
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 345,
+      "t": 11.5,
+      "box": [
+        753,
+        826,
+        1197,
+        1067
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 360,
+      "t": 12.0,
+      "box": [
+        753,
+        826,
+        1198,
+        1067
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 375,
+      "t": 12.5,
+      "box": [
+        752,
+        826,
+        1198,
+        1068
+      ],
+      "object_type": "car",
+      "confidence": null
+    },
+    {
+      "frame": 390,
+      "t": 13.0,
+      "box": [
+        752,
+        826,
+        1199,
+        1068
+      ],
+      "object_type": "car",
+      "confidence": null
+    }
+  ]
+}

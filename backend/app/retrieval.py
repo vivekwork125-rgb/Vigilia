@@ -24,6 +24,19 @@ from .temporal import matches as temporal_matches
 
 COLORS = ("red", "blue", "green", "yellow", "white", "black", "gray", "purple")
 EVENT_PATTERNS = [
+    ("exited_zone", r"exit(?:ed|ing)? (?:a |the )?zone"),
+    ("appeared", r"enter(?:ed|ing)? (?:a |the )?scene"),
+    ("started_moving", r"start(?:ed|s)?(?: moving)?|began moving"),
+    ("stationary", r"stationary|parked"),
+    (
+        "approached_object",
+        r"approach(?:ed|ing)? (?:an? |the )?(?:object|bag|backpack|suitcase)",
+    ),
+    (
+        "approached_person",
+        r"approach(?:ed|ing)? (?:an? |the |another )?(?:person|people)",
+    ),
+    ("moved_away", r"mov(?:ed|ing|e) away"),
     (
         "placed_object",
         r"left (?:an? |the )?(?:object|bag|backpack|suitcase)|placed|put down|drop(?:ped)?|abandon",
@@ -39,8 +52,19 @@ EVENT_PATTERNS = [
         "exited",
         r"exit(?:ed|ing)?|depart(?:ed|ure)?|left (?:the )?(?:scene|entrance|parking)|drove away",
     ),
-    ("stopped", r"stop(?:ped)?|stationary|parked"),
+    ("stopped", r"stop(?:ped)?"),
     ("carried", r"carrying|carried|with (?:a )?backpack"),
+]
+UNSUPPORTED_ACTIONS = [
+    ("talks_to_person", r"talk(?:ed|s|ing)? to|conversation|convers(?:ed|ing)"),
+    (
+        "phone_use",
+        r"(?:us(?:e|ed|ing)|talk(?:ed|s|ing)? on|text(?:ed|s|ing)? on) (?:a |the )?(?:phone|telephone)",
+    ),
+    ("turned_left", r"turn(?:ed|s|ing)? left"),
+    ("turned_right", r"turn(?:ed|s|ing)? right"),
+    ("reversed", r"revers(?:e|ed|es|ing)"),
+    ("rides_bicycle", r"rid(?:e|es|ing) (?:a |the )?(?:bicycle|bike)"),
 ]
 SYNONYMS = [
     (r"\bpeople\b|\bman\b|\bwoman\b", "person"),
@@ -95,7 +119,17 @@ def parse_query(query):
         "temporal_relation": None,
         "window_seconds": None,
         "warnings": [],
+        "unsupported_activity": next(
+            (kind for kind, pattern in UNSUPPORTED_ACTIONS if re.search(pattern, q)),
+            None,
+        ),
     }
+    if result["entity"] != "person" and re.search(r"\bvehicles?\b", q):
+        result["entity"] = "vehicle"
+    if result["unsupported_activity"]:
+        result["warnings"].append(
+            "This activity has no production action detector; no matching action results can be returned."
+        )
     camera = re.search(r"(?:camera|cam)[ _-]*0?(\d+)", q)
     if camera:
         result["camera"] = f"CAM-{int(camera[1]):02d}"
@@ -170,10 +204,10 @@ def parse_query(query):
 
 
 def event_matches(kind, wanted):
+    if wanted == "stationary":
+        return kind in ("stationary", "stopped", "became_stationary")
     if wanted == "exited":
         return kind in ("exited", "disappeared")
-    if wanted == "entered_zone":
-        return kind in ("entered_zone", "appeared")
     return kind == wanted
 
 
@@ -266,6 +300,8 @@ def search(
     if camera:
         parsed["camera"] = camera
     statement = select(Event)
+    if parsed["unsupported_activity"]:
+        statement = statement.where(False)
     if demo_only:
         statement = (
             statement.join(Evidence, Event.evidence_id == Evidence.id)
@@ -319,6 +355,10 @@ def search(
         end = datetime.fromisoformat(item["end"])
         if parsed["entity"] and not any(
             e["object_type"] == parsed["entity"]
+            or (
+                parsed["entity"] == "vehicle"
+                and e["object_type"] in ("car", "truck", "bus", "motorcycle")
+            )
             or (
                 parsed["entity"] == "bag"
                 and e["object_type"] in ("backpack", "suitcase")

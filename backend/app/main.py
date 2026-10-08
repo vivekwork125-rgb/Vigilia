@@ -450,13 +450,23 @@ def relationships(entity_id: str):
 
 
 @app.get("/graph")
-def graph():
+def graph(event_id: str | None = None):
     with session() as s:
         entities = s.scalars(select(Entity)).all()
-        events = s.scalars(select(Event).order_by(Event.start).limit(200)).all()
+        events = (
+            [require(s, Event, event_id)]
+            if event_id
+            else s.scalars(select(Event).order_by(Event.start).limit(200)).all()
+        )
         cameras = s.scalars(select(Camera)).all()
         locations = s.scalars(select(Location)).all()
-        relationships = s.scalars(select(Relationship)).all()
+        relationships = s.scalars(
+            select(Relationship).where(
+                Relationship.evidence_id == events[0].evidence_id
+            )
+            if event_id
+            else select(Relationship)
+        ).all()
         event_by_evidence = {
             evidence_id: event_id
             for event_id, evidence_id in s.execute(

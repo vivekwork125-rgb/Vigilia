@@ -152,6 +152,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export const post = <T>(path: string, body: unknown = {}) =>
   api<T>(path, { method: "POST", body: JSON.stringify(body) });
 export const time = (value: string) => value.slice(11, 19);
+export const timezoneLabel = (value: string) => {
+  const offset = value.match(/([+-]\d{2}:\d{2}|Z)$/)?.[1];
+  return offset ? (offset === "Z" ? "UTC" : `UTC${offset}`) : "source clock · timezone unspecified";
+};
 export const duration = (seconds: number) =>
   `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 export function download(text: string, name: string, type = "text/markdown") {

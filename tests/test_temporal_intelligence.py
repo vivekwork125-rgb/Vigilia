@@ -249,3 +249,74 @@ def test_uploaded_pixel_video_to_placement_search_and_source(
     ).json()
     report = client.post(f"/investigations/{inv['id']}/report").json()["markdown"]
     assert hit["evidence"]["id"] in report and "INFERRED" in report
+
+
+def test_pickup_uses_closest_person_not_every_nearby_person():
+    person = [
+        sample(t, 125 if t <= 5 else 125 + 8 * (t - 5), "person") for t in range(12)
+    ]
+    nearby = [
+        sample(t, 145 if t <= 5 else 145 + 2 * (t - 5), "person") for t in range(12)
+    ]
+    bag = [
+        sample(t, 140 if t <= 5 else 140 + 8 * (t - 5), "backpack", 55, 15, 20)
+        for t in range(12)
+    ]
+    events = track_events({"p": person, "nearby": nearby, "o": bag}, 400, 160)
+    pickups = [e for e in events if e.kind == "picked_up"]
+    assert len(pickups) == 1
+    assert pickups[0].keys == ("p", "o")
+
+
+def test_pickup_ignores_detector_jitter_as_object_motion():
+    person = [sample(t, 125 + 8 * max(0, t - 5), "person") for t in range(12)]
+    jitter = [140, 141, 139, 141, 140, 142, 139, 141, 140, 141, 139, 140]
+    bag = [sample(t, x, "backpack", 55, 15, 20) for t, x in enumerate(jitter)]
+    events = track_events({"p": person, "o": bag}, 400, 160)
+    assert not any(e.kind == "picked_up" for e in events)
+
+
+def test_real_meva_static_vehicle_and_detection_gap_do_not_establish_stop():
+    import json
+    from pathlib import Path
+    from app.temporal_events import continuous_tracks
+    from app.processing import extract_events
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/meva_vehicle_gap.json").read_text()
+    )
+    samples = fixture["samples"]
+    segments = continuous_tracks({"car": samples})
+    assert len(segments) == 2
+    for segment in segments.values():
+        assert not any(e[0] == "stopped" for e in extract_events(segment, 15))
+        assert not any(
+            e.kind in ("stopped", "started_moving")
+            for e in track_events({"car": segment}, 1920, 1072)
+        )
+
+
+def test_pickup_rejects_opposite_motion_and_ambiguous_person():
+    bag = [
+        sample(t, 140 + 8 * max(0, t - 5), "backpack", 55, 15, 20) for t in range(12)
+    ]
+    opposite = [sample(t, 165 - 8 * max(0, t - 5), "person") for t in range(12)]
+    assert not any(
+        e.kind == "picked_up" for e in track_events({"p": opposite, "o": bag}, 400, 160)
+    )
+    person = [sample(t, 125 + 8 * max(0, t - 5), "person") for t in range(12)]
+    assert not any(
+        e.kind == "picked_up"
+        for e in track_events({"p": person, "q": person, "o": bag}, 400, 160)
+    )
+
+
+def test_placement_requires_prior_coupling_and_sustained_separation():
+    bag = [sample(t, 115 + 10 * min(t, 5), "backpack", 55, 15, 20) for t in range(16)]
+    bystander = [
+        sample(t, 150 if t <= 5 else 150 + 15 * (t - 5), "person") for t in range(16)
+    ]
+    assert not any(
+        e.kind == "placed_object"
+        for e in track_events({"p": bystander, "o": bag}, 400, 160)
+    )

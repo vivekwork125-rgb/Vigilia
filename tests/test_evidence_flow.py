@@ -236,7 +236,7 @@ def test_indexing_integration_creates_grounded_events(client, tmp_path, monkeypa
     monkeypatch.setattr("app.processing.detector", DeterministicDetector)
     process(result["id"])
     response = client.post(
-        "/search", json={"query": "person stopped", "camera": "TRACK-TEST"}
+        "/search", json={"query": "person stationary", "camera": "TRACK-TEST"}
     ).json()
     assert response["results"]
     event = response["results"][0]
@@ -309,7 +309,7 @@ def test_query_parser():
 def test_event_rules_and_iou():
     samples = [{"t": t, "box": [10, 10, 30, 70]} for t in range(6)]
     events = extract_events(samples, 10)
-    assert ("stopped", 0, 5, "INFERRED") in events
+    assert not any(e[0] == "stopped" for e in events)
     assert events[0][0] == "appeared" and events[0][3] == "OBSERVED"
     assert (
         iou([0, 0, 10, 10], [0, 0, 10, 10]) == 1

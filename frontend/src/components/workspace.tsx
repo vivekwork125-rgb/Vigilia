@@ -36,6 +36,7 @@ import {
   download,
   duration,
   time,
+  timezoneLabel,
   type Camera,
   type EvidenceEvent,
   type Investigation,
@@ -381,7 +382,9 @@ export default function Workspace() {
               aria-label="Show data provenance information"
               onClick={() =>
                 setToast(
-                  "Demo footage and annotations are generated. Uploaded footage is processed independently. Every result retains its source frames.",
+                  overview?.demo_mode
+                    ? "Demo footage and annotations are generated. Uploaded footage is processed independently. Every result retains its source frames."
+                    : "Indexed source footage is processed from video pixels. Activity labels are used only by the separate benchmark. Every result retains its source frames.",
                 )
               }
             >
@@ -444,14 +447,13 @@ export default function Workspace() {
                 {searchBox(true)}
                 <div className="suggestions">
                   <span>Try asking</span>
-                  {[
-                    "Who left an object at the east entrance?",
-                    "People approaching a vehicle",
-                    "Vehicles stopped for more than 20 seconds",
-                  ].map((q, i) => (
+                  {(overview?.demo_mode
+                    ? ["Who left an object at the east entrance?", "People approaching a vehicle", "Vehicles stopped for more than 20 seconds"]
+                    : ["Vehicle started", "Vehicle stopped", "Person approached another person"]
+                  ).map((q, i) => (
                     <button
                       key={q}
-                      onClick={() => void runSearch(i === 0 ? SAMPLE_QUERY : q)}
+                      onClick={() => void runSearch(i === 0 && overview?.demo_mode ? SAMPLE_QUERY : q)}
                     >
                       {q}
                       <ArrowRight size={12} />
@@ -556,7 +558,7 @@ export default function Workspace() {
                         </span>
                         <span className="camera-time">
                           {v ? time(v.recording_start) : "No recording"}{" "}
-                          <span>UTC+05:30</span>
+                          <span>{v ? timezoneLabel(v.recording_start) : ""}</span>
                         </span>
                       </div>
                       <div className="camera-info">
@@ -626,21 +628,19 @@ export default function Workspace() {
                     <Focus size={40} />
                     <span className="orbit-point" />
                   </div>
-                  <h2>
-                    An object. An entrance.
-                    <br />A trail of evidence.
-                  </h2>
-                  <p>
-                    A person leaves a backpack near the east entrance. Find the
-                    moment. Follow the timeline. Verify the source.
-                  </p>
+                  <h2>{overview?.demo_mode ? <>An object. An entrance.<br />A trail of evidence.</> : <>A question. A timestamp.<br />A source frame.</>}</h2>
+                  <p>{overview?.demo_mode
+                    ? "A person leaves a backpack near the east entrance. Find the moment. Follow the timeline. Verify the source."
+                    : "Search the indexed footage. Inspect each motion hypothesis against its exact source video and track."}</p>
                   <button
                     className="primary"
-                    onClick={() => void runSearch(SAMPLE_QUERY)}
+                    onClick={() => void runSearch(overview?.demo_mode ? SAMPLE_QUERY : "vehicle started")}
                   >
                     Start investigation <ArrowRight size={16} />
                   </button>
-                  <small>3 synthetic cameras · Source-linked annotations</small>
+                  <small>{overview?.demo_mode
+                    ? "3 synthetic cameras · Source-linked annotations"
+                    : `${cameras.length} indexed cameras · Source-linked predictions`}</small>
                 </section>
               </div>
               <footer className="workspace-footer">
@@ -797,8 +797,10 @@ export default function Workspace() {
               ) : response ? (
                 <>
                   <Empty
-                    title="No sufficiently strong match found"
-                    detail="No indexed observation satisfies this query. This does not establish that the event or person was absent."
+                    title={response.parsed.unsupported_activity ? "Activity not supported" : "No sufficiently strong match found"}
+                    detail={response.parsed.unsupported_activity
+                      ? `The current detector cannot infer ${String(response.parsed.unsupported_activity).replaceAll("_", " ")}. No observation was treated as proof of this activity.`
+                      : "No indexed observation satisfies this query. This does not establish that the event or person was absent."}
                   />
                   {response.coverage && (
                     <div className="panel coverage">
@@ -823,7 +825,9 @@ export default function Workspace() {
               ) : (
                 <Empty
                   title="Begin with a question"
-                  detail="Try “Find the person who left an object near the east entrance”, or upload a reference image."
+                  detail={overview?.demo_mode
+                    ? "Try “Find the person who left an object near the east entrance”, or upload a reference image."
+                    : "Try “vehicle started” or “person approached another person”, then inspect the source evidence."}
                 />
               )}
             </>
