@@ -24,6 +24,11 @@ def absolute(video, seconds):
     ).isoformat()
 
 
+def source_frame(seconds, fps, frame_count):
+    """Nearest decoded source frame; avoid float truncation before a sample."""
+    return min(frame_count - 1, max(0, round(seconds * fps)))
+
+
 def create_event(
     s,
     video,
@@ -42,7 +47,8 @@ def create_event(
 ):
     if not 0 <= start <= end <= video.duration:
         raise ValueError("Event interval must lie inside the source video")
-    a, b = int(start * video.fps), min(video.frame_count - 1, int(end * video.fps))
+    a = source_frame(start, video.fps, video.frame_count)
+    b = source_frame(end, video.fps, video.frame_count)
     payload = {
         "video": video.id,
         "source_sha256": video.sha256,

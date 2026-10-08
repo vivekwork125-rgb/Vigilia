@@ -24,7 +24,8 @@ Record actual measurements after each run:
 
 The numbers above illustrate command syntax only; they are **not** study data and are not stored in the repository. The recorder writes ignored `data/timing-study.csv`. Summary metrics remain null until a matching manual/assisted pair exists. Report the number of participants/tasks, per-condition times, paired reduction, distribution/uncertainty, and task failures. The in-app paired timing field currently records a single total per mode; the CLI captures the three required milestones.
 
-Current state: **zero independent real-footage labels and zero human timing pairs have been collected for this completion audit**. No evidence supports a “significantly faster” claim yet.
+At the time of the earlier completion audit, no independent real-footage labels or human timing pairs had been collected. The separate MEVA work below now provides real-footage activity labels; human timing pairs remain at zero. No evidence supports a “significantly faster” claim.
+
 # Real MEVA evaluation
 
-The separate [MEVA protocol](MEVA.md) evaluates eight real sources against external KPF annotations without injecting ground truth into runtime. It records the original baseline, one-to-one camera/time/type/class/spatial matches, direct and approximate metrics separately, unsupported activity counts, source evidence validation, query checks, performance and every FP/FN. See [measured results](MEVA_REPORT.md). The development-fixture results below retain their original scope.
+The separate [MEVA protocol](MEVA.md) evaluates eight real sources against external KPF annotations without injecting ground truth into runtime. It records the pre-improvement and improved 2 FPS runs, one-to-one camera/time/type/class/spatial matches, actor-track coverage, event-rule failures, retrieval ranks, unsupported activity counts, source evidence validation, performance and every FP/FN. See [measured results](MEVA_REPORT.md). The development-fixture results above retain their original scope.

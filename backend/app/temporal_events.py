@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass, field
 from itertools import pairwise
 from math import hypot
+from statistics import median
 
 VEHICLES = {"car", "truck", "bus", "motorcycle"}
 PORTABLE = {"backpack", "handbag", "suitcase", "bag", "briefcase", "bottle"}
@@ -82,6 +83,77 @@ def continuous_tracks(tracks, max_gap=1.5):
             if group:
                 output[key if len(groups) == 1 else f"{key}@{index}"] = group
     return output
+
+
+def vehicle_transitions(key, samples):
+    """Locate a measured deceleration/acceleration, confirmed by later state.
+
+    The interval ends at the stationary or moving transition; later samples
+    verify it. Median edge velocities and separate state thresholds absorb
+    bounding-box jitter without claiming a stop from one noisy frame.
+    """
+    if len(samples) < 7:
+        return []
+    scale = max(1, median(s["box"][3] - s["box"][1] for s in samples))
+    raw = [speed(a, b, scale) for a, b in pairwise(samples)]
+    smooth = [median(raw[max(0, i - 1) : min(len(raw), i + 2)]) for i in range(len(raw))]
+    still = [v <= 0.12 for v in smooth]
+    active = [v >= 0.28 for v in smooth]
+    runs = []
+    first = None
+    for i, value in enumerate(still + [False]):
+        if value and first is None:
+            first = i
+        elif not value and first is not None:
+            if samples[i]["t"] - samples[first]["t"] >= 1.5:
+                runs.append((first, i))
+            first = None
+    result = []
+    for first, last in runs:
+        # The final stationary state certifies a preceding moving-to-still
+        # transition. Report its deceleration interval, not the later plateau.
+        preceding = [
+            i for i in range(first)
+            if samples[first]["t"] - samples[i]["t"] <= 4
+        ]
+        high = [i for i in preceding if active[i]]
+        if len(high) >= 2:
+            peak = max(high, key=lambda i: smooth[i])
+            px, py = center(samples[peak])
+            sx, sy = center(samples[first])
+            displaced = hypot(sx - px, sy - py) / scale
+            if smooth[peak] - smooth[first] >= 0.2 and displaced >= 0.3:
+                result.append(
+                    Candidate(
+                        "stopped", (key,), samples[peak]["t"], samples[first]["t"],
+                        attributes={
+                            "deceleration_peak_speed_box_heights_per_second": round(smooth[peak], 4),
+                            "stationary_verified_until": samples[last]["t"],
+                            "motion_state_method": "median three-edge normalized velocity; sustained stillness",
+                        },
+                    )
+                )
+        # A true start requires a visible stationary history and sustained
+        # later movement, not a track birth or brief detector displacement.
+        for i in range(last, len(active) - 1):
+            if samples[i]["t"] - samples[last]["t"] > 4:
+                break
+            if active[i] and active[i + 1]:
+                px, py = center(samples[last])
+                mx, my = center(samples[i + 2])
+                if hypot(mx - px, my - py) / scale >= 0.3:
+                    result.append(
+                        Candidate(
+                            "started_moving", (key,), samples[last]["t"], samples[i + 2]["t"],
+                            attributes={
+                                "prior_stationary_observed": True,
+                                "moving_verified_until": samples[i + 2]["t"],
+                                "motion_state_method": "median three-edge normalized velocity; sustained motion",
+                            },
+                        )
+                    )
+                break
+    return result
 
 
 def coupling(person, obj, start, end):
@@ -275,6 +347,8 @@ def track_events(tracks, width, height, zones=(), unattended_seconds=None):
     valid = {key: samples for key, samples in tracks.items() if len(samples) >= 3}
     for key, samples in valid.items():
         typ = samples[0]["object_type"]
+        if typ in VEHICLES:
+            out.extend(vehicle_transitions(key, samples))
         scale = max(1, samples[0]["box"][3] - samples[0]["box"][1])
         motion = moving(samples, scale)
         stationary = list(intervals(motion, samples, False))
@@ -283,8 +357,8 @@ def track_events(tracks, width, height, zones=(), unattended_seconds=None):
             if end - start >= 2:
                 prior_motion = any(b == start and b - a >= 1 for a, b in movements)
                 kind = (
-                    ("stopped" if typ in VEHICLES | {"person"} else "became_stationary")
-                    if prior_motion
+                    ("stopped" if typ == "person" else "became_stationary")
+                    if prior_motion and typ not in VEHICLES
                     else "stationary"
                 )
                 output_end = min(end, start + 2) if prior_motion else end
@@ -301,7 +375,7 @@ def track_events(tracks, width, height, zones=(), unattended_seconds=None):
                     )
                 )
         for start, end in movements:
-            if end - start >= 1 and any(
+            if typ not in VEHICLES and end - start >= 1 and any(
                 b == start and b - a >= 2 for a, b in stationary
             ):
                 out.append(

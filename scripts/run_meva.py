@@ -19,6 +19,8 @@ if __name__ == "__main__":
         ("validate_meva.py", []),
         ("process_meva.py", ["--run-dir", str(args.run_dir)]),
         ("evaluate_meva.py", ["--run-dir", str(args.run_dir), "--verify-api"]),
+        ("diagnose_meva.py", ["--run-dir", str(args.run_dir)]),
+        ("probe_meva_perception.py", ["--run-dir", str(args.run_dir)]),
         ("review_meva.py", ["--run-dir", str(args.run_dir)]),
     ):
         result = subprocess.run(

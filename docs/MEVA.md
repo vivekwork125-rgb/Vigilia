@@ -38,6 +38,8 @@ The equivalent separate commands are:
 .venv/bin/python scripts/validate_meva.py
 .venv/bin/python scripts/process_meva.py --run-dir data/meva/reproduction
 .venv/bin/python scripts/evaluate_meva.py --run-dir data/meva/reproduction --tolerance 2 --min-iou 0.1 --min-spatial-iou 0.1 --verify-api
+.venv/bin/python scripts/diagnose_meva.py --run-dir data/meva/reproduction
+.venv/bin/python scripts/probe_meva_perception.py --run-dir data/meva/reproduction
 .venv/bin/python scripts/review_meva.py --run-dir data/meva/reproduction
 ```
 
@@ -49,10 +51,14 @@ Each run writes ignored local artifacts:
 - `benchmark-results.json`, `benchmark-results.csv`
 - `predictions.json`, `ground-truth.json`
 - `error-analysis.json`, `error-analysis.csv` — every unmatched prediction/label, plus nearest counterpart when available; nearest is diagnostic, not a match
+- `failure-diagnostics.json`, `failure-diagnostics.csv` — annotation-level actor coverage, track fragments, event-rule coverage and search rank, with per-event summaries
+- `detector-coverage.json` — separate raw YOLO.predict box coverage at exact sampled MEVA frames, compared after inference against annotation boxes; clarifies detector misses versus ByteTrack/storage misses
 - `error-contact-sheet.jpg` and source-frame reference JSON — a diverse sample of errors, not every error
 - `.api-token` — generated local API credential, mode 0600; never committed or included in reports
 
 The JSON records detector/tracker, weight hash, production code hash and diff against the recorded Git revision, package versions, sampling/size/confidence, unattended interval, measured processing times, and query latency. Detector and tracker wall time is combined because `YOLO.track` exposes no separate tracker measurement here. Decoded processing FPS and sampled inference throughput are reported separately. No investigation-time savings or controlled speedup is claimed.
+
+The sampler uses the requested time grid, rounding each target instant to the nearest source frame. For example, 30 FPS source at `SAMPLE_FPS=4` alternates seven/eight-frame gaps and yields 4 FPS rather than 3.75 FPS. Evidence frames also use nearest-frame rounding to preserve exact sampled source boxes.
 
 ## Isolation and timing
 
@@ -85,3 +91,5 @@ Every generated event is checked against its evidence, primary observation, supp
 Corrections separate stationary presence from a moving-to-stationary transition, require prior sustained states, split long detection gaps, compare coupling vectors in the same coordinate scale, abstain on ambiguous person association, require prior coupling and sustained separation for placement, and constrain supported/unsupported action search. Regressions include measured MEVA vehicle boxes spanning a 10.5-second detection gap. Tests do not inject labels into runtime.
 
 G424 frame 300 (10 seconds) produces a green-tinted image in random-access and sequential OpenCV decoding and in independent FFmpeg extraction. It is retained and exposed in error analysis. This is a source/decoding-content anomaly, not a missing file or a reason to remove the camera. Small manipulated objects, occlusion, track fragmentation, detector jitter, unmodeled activity semantics and temporal localization remain major limitations. Weak results are retained. Final measured results and verification are in [the engineering report](MEVA_REPORT.md) and [result summary](meva-results.json).
+
+The 7ccb717 pre-improvement run is preserved in [its own summary](meva-pre-improvement-results.json); the older [initial-rule baseline](meva-baseline-results.json) predates that commit. The accuracy pass compares the former to the new full 2 FPS run using the unchanged matching definition. The stage diagnostics are evaluation-only and never feed labels into runtime processing.

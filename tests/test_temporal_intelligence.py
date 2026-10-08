@@ -1,6 +1,8 @@
 """Transition rules and a pixel-derived upload-to-evidence regression."""
 
+import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -11,6 +13,52 @@ from app.retrieval import parse_query
 from app.temporal import matches
 from app.temporal_events import track_events
 from sqlalchemy import select
+
+
+REAL_VEHICLE_BOXES = json.loads(
+    (Path(__file__).parent / "fixtures/meva_vehicle_transitions.json").read_text()
+)["cases"]
+
+
+def test_real_meva_deceleration_interval_precedes_verified_stationary_state():
+    events = track_events({"car": REAL_VEHICLE_BOXES["stop_after_deceleration"]}, 1920, 1080)
+    stops = [event for event in events if event.kind == "stopped"]
+    assert len(stops) == 1
+    assert 164 <= stops[0].start <= 166
+    assert 168 <= stops[0].end <= 169
+    assert stops[0].category == "INFERRED"
+
+
+def test_real_meva_start_after_stationary_with_short_detection_gap():
+    events = track_events({"car": REAL_VEHICLE_BOXES["start_after_stationary"]}, 1920, 1072)
+    starts = [event for event in events if event.kind == "started_moving"]
+    assert len(starts) == 1
+    assert 18 <= starts[0].start <= 20
+    assert 20 <= starts[0].end <= 22
+
+
+def test_real_meva_parked_car_jitter_is_not_a_transition():
+    events = track_events({"car": REAL_VEHICLE_BOXES["parked_jitter"]}, 1920, 1080)
+    assert not {"started_moving", "stopped"} & {event.kind for event in events}
+
+
+def test_vehicle_stop_followed_by_start_needs_sustained_state():
+    positions = [
+        10 + 20 * t if t <= 4 else 90 if t <= 8 else 90 + 20 * (t - 8)
+        for t in range(15)
+    ]
+    car = [sample(t, x, "car", h=40, w=60) for t, x in enumerate(positions)]
+    events = track_events({"car": car}, 500, 160)
+    assert len([e for e in events if e.kind == "stopped"]) == 1
+    assert len([e for e in events if e.kind == "started_moving"]) == 1
+    assert all(e.category == "INFERRED" for e in events if e.kind in {"stopped", "started_moving"})
+
+
+def test_person_passing_stationary_object_does_not_imply_pickup():
+    person = [sample(t, 10 + 18 * t, "person") for t in range(12)]
+    bag = [sample(t, 110, "backpack", 55, 15, 20) for t in range(12)]
+    events = track_events({"person": person, "bag": bag}, 400, 160)
+    assert not any(e.kind in {"picked_up", "placed_object"} for e in events)
 
 
 def sample(t, x, kind, y=40, w=20, h=40):

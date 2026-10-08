@@ -1,14 +1,18 @@
 """KPF parsing, independent matching and runtime isolation regression tests."""
 
 import ast
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 import yaml
 from meva.annotations import parse_activities, parse_geometry, parse_types
 from meva.dataset import load_manifest, resolve, validate
+from meva.diagnostics import actor_coverage, motion_summary
 from meva.evaluation import match, spatial_compatibility
 from meva.mapping import mapping
+from meva.perception_probe import sampled_annotation_frames
+from app.evidence import absolute
 
 
 def annotation_files(tmp_path, span=(10, 20), ident=71):
@@ -55,6 +59,54 @@ def test_kpf_preserves_ids_frames_and_actual_fps(tmp_path):
         0.8,
         0.84,
     )
+
+
+def test_meva_source_clock_and_inclusive_frame_boundary(tmp_path):
+    types, activities, _ = annotation_files(tmp_path, span=(430, 500))
+    source = video(fps=30)
+    source["frame_count"] = 9001
+    row = parse_activities(activities, source, parse_types(types))[0]
+    recording = SimpleNamespace(recording_start="2018-03-15T15:55:00")
+    assert row["start_seconds"] == 430 / 30
+    assert row["end_seconds"] == 500 / 30
+    assert row["end_exclusive_seconds"] - row["end_seconds"] == pytest.approx(1 / 30)
+    assert absolute(recording, row["start_seconds"]) == "2018-03-15T15:55:14.333333"
+    assert absolute(recording, row["end_seconds"]) == "2018-03-15T15:55:16.666667"
+
+
+def test_actor_coverage_uses_exact_sample_frames_and_spatial_overlap():
+    truth = {
+        "start_frame": 0,
+        "end_frame": 15,
+        "actor_types": {"7": "vehicle"},
+    }
+    boxes = [
+        {"frame": frame, "t": frame / 30, "box": [10, 10, 30, 30]}
+        for frame in (0, 8, 15)
+    ]
+    observations = [SimpleNamespace(entity_id="e", track_id="t", boxes=boxes, confidence=0.8)]
+    geometry = {7: {frame: [10, 10, 30, 30] for frame in (0, 8, 15)}}
+    result = actor_coverage(truth, 7, geometry, observations, {"e": "car"}, 30, 4)
+    assert result["detected_during_activity"]
+    assert result["sampled_event_coverage"] == 1
+    assert result["fragments"] == 1
+    assert not actor_coverage(truth, 7, {7: {0: [100, 100, 120, 120]}}, observations, {"e": "car"}, 30, 4)["detected_during_activity"]
+
+
+def test_detector_probe_uses_the_same_exact_sampling_grid():
+    assert sampled_annotation_frames(430, 500, 30, 2) == [435, 450, 465, 480, 495]
+    assert sampled_annotation_frames(0, 30, 30, 4) == [0, 8, 15, 22, 30]
+
+
+def test_track_quality_summary_separates_gaps_from_velocity():
+    hits = [
+        {"t": t, "box": [x, 0, x + 20, 20]}
+        for t, x in ((0.0, 0), (0.5, 10), (1.0, 20), (3.0, 30))
+    ]
+    summary = motion_summary(hits, 2)
+    assert summary["median_normalized_speed_box_heights_per_second"] == 1
+    assert summary["gaps_longer_than_1_5_sample_periods"] == 1
+    assert summary["longest_contiguous_segment_samples"] == 3
 
 
 @pytest.mark.parametrize("span", [(20, 10), (-1, 20), (0, 100)])

@@ -6,8 +6,23 @@ import pytest
 from sqlalchemy import select
 from app.db import session, Event, Evidence, Video, Observation
 from app.retrieval import parse_query
-from app.processing import extract_events, process
+from app.processing import extract_events, process, sampled_frame
 from app.vision import iou
+from app.evidence import source_frame
+
+
+def test_meva_sample_times_round_to_the_actual_source_frame():
+    # These are measured frames from the 3.75 FPS diagnostic. Truncation put
+    # their evidence one frame before the source observation.
+    assert source_frame(32.8, 30, 9001) == 984
+    assert source_frame(65.86666666666666, 30, 9001) == 1976
+    assert source_frame(135.2, 30, 9001) == 4056
+
+
+def test_sampling_schedule_uses_requested_rate_when_fps_ratio_is_fractional():
+    assert [sampled_frame(n, 30, 4) for n in range(6)] == [0, 8, 15, 22, 30, 38]
+    assert sampled_frame(1200, 30, 4) == 9000
+    assert [sampled_frame(n, 30, 2) for n in range(4)] == [0, 15, 30, 45]
 
 
 def test_search_to_source_and_report(client):

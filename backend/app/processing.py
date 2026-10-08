@@ -45,6 +45,11 @@ def extract_events(samples, duration):
     return result
 
 
+def sampled_frame(sample_number, source_fps, target_fps):
+    """Nearest source frame on an evenly spaced wall-clock sampling grid."""
+    return round(sample_number * source_fps / target_fps)
+
+
 def process(video_id, model_override=None):
     begun = time.perf_counter()
     decode_seconds = detector_tracking_seconds = 0.0
@@ -70,7 +75,7 @@ def process(video_id, model_override=None):
             "Video cannot be decoded; unsupported codec or corrupt source"
         )
     fps = cap.get(cv2.CAP_PROP_FPS)
-    step = max(1, round(fps / SAMPLE_FPS))
+    next_sample_frame = 0
     tracks = defaultdict(list)
     crops = {}
     ocr = []
@@ -84,7 +89,7 @@ def process(video_id, model_override=None):
             decode_seconds += time.perf_counter() - tick
             if not ok:
                 break
-            if frame_idx % step == 0:
+            if frame_idx == next_sample_frame:
                 t = frame_idx / fps
                 # Cut resets keep tracker identities scoped to continuous scenes.
                 gray = cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (64, 36))
@@ -101,6 +106,9 @@ def process(video_id, model_override=None):
                 detections = model.detect(frame)
                 detector_tracking_seconds += time.perf_counter() - tick
                 sampled_frames += 1
+                next_sample_frame = max(
+                    frame_idx + 1, sampled_frame(sampled_frames, fps, SAMPLE_FPS)
+                )
                 for item in detections:
                     key = f"{scene}-{item['track_id']}"
                     x1, y1, x2, y2 = item["box"]
@@ -114,7 +122,7 @@ def process(video_id, model_override=None):
                     crop = frame[y1:y2, x1:x2]
                     if key not in crops or crop.size > crops[key].size:
                         crops[key] = crop.copy()
-                if reader is not None and frame_idx % (step * 10) == 0:
+                if reader is not None and (sampled_frames - 1) % 10 == 0:
                     for box, text, confidence in reader.readtext(frame):
                         if confidence >= 0.6:
                             ocr.append((t, text, float(confidence)))
