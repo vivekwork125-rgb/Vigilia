@@ -675,7 +675,13 @@ def main():
     parser.add_argument("--contact-thresh", type=float, default=0.45)
     parser.add_argument("--output-json", default="data/meva/manipulation-confirmation-results.json")
     parser.add_argument("--output-csv", default="data/meva/manipulation-confirmation-case-diagnostics.csv")
+    parser.add_argument("--allow-biased-pilot", action="store_true",
+                        help="Rerun the historical GT-windowed exploratory pilot only")
     args = parser.parse_args()
+    if not args.allow_biased_pilot:
+        parser.error("Historical GT-windowed pilot is not a no-leakage benchmark. "
+                     "Use experiment_meva_confirmation_unbiased.py extract/evaluate; "
+                     "pass --allow-biased-pilot only to reproduce the old exploratory artifact.")
 
     print("=== VIGILIA Secondary Manipulation Confirmation Gate Experiment ===")
     print(f"Model: {args.model}")

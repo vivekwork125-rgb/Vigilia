@@ -1,264 +1,98 @@
-# VIGILIA — Secondary Manipulation Confirmation Gate Report
+# MEVA secondary manipulation confirmation: full-video audit
 
-## 1. Executive Summary
+## Decision
 
-This report presents the experimental evaluation of an independent, candidate-triggered **secondary confirmation gate** designed to reduce false manipulation hypotheses (`person_picks_up_object`, `person_puts_down_object`) in surveillance intelligence.
+**D — No meaningful confirmation of physical manipulation. Production change: NO.** A secondary gate removes some interaction-like candidates, but the remaining candidates are not trustworthy manipulation evidence. In the leakage-controlled, full-video evaluation, the strongest recall-preserving two-signal gate retained only **2/15 pickup** and **3/15 placement** temporal-and-person matches, with **5.0% pickup precision** and **8.8% placement precision** among all emitted candidates. No object identity, actual contact, possession, or release was established. These are candidate-level diagnostic numbers, not production event accuracy.
 
-The upstream hand-object contact experiment (commit `89dc216`) established that while pose estimation (`YOLO11n-pose`) and interaction-region tracking achieve $100\%$ person and hand coverage and reach up to $60.0\%$ recall, ordinary human actions (walking, standing with clasped hands, adjusting waistbands, reaching into pockets, or gesturing) frequently satisfy kinematic contact and persistence heuristics.
+## Frozen production and previous exploratory baseline
 
-To address this, we designed and implemented [backend/meva/manipulation_confirmation.py](file:///Users/yanalavivekreddy/VIGILIA/backend/meva/manipulation_confirmation.py) to investigate whether cheap, deterministic, interpretable visual and temporal signals can distinguish genuine manipulation from benign hand activity:
-$$\text{PERSON} \to \text{HAND / WRIST} \to \text{PERSISTENT INTERACTION} \to \mathbf{SECONDARY\ CONFIRMATION\ GATE} \to \text{MANIPULATION CANDIDATE}$$
+Production remains YOLO11n, 640 pixels, confidence 0.30, ByteTrack, 2 FPS. The frozen eight-video DIRECT benchmark has 89 GT events, 17 predictions, 8 matches, 47.06% precision, 8.99% recall, mean temporal IoU 0.5976, 0/15 pickups, 0/15 placements, and 2,443/2,443 valid production evidence chains. No production code, event rule, model, tracking parameter, or independent benchmark definition changed here.
 
-### Core Empirical Findings
+The `89dc216` hand/interaction-region experiment reported 9/15 pickup and 9/15 placement case matches (60% recall), with 34.62% and 47.37% precision respectively. The subsequent `cd7b7d4` confirmation pilot reported similar results and a best negative-control rejection rate of 80%. **Those pilot accuracy numbers are not valid full-video estimates.** Their scripts selected inference frames using GT activity times plus context and reset the state machine at each labeled window. The `cd7b7d4` pilot also called a case matched if any candidate overlapped its GT interval or merely started within two seconds, without one-to-one matching or actor-box compatibility; its “precision” divided case-level matches by a mix of candidates and negative controls. The pilot did not inject labels into the pose model or feature formulas, but its candidate selection and scoring violated the requested no-leakage evaluation protocol. Its generated results remain historical exploratory artifacts only.
 
-1. **Candidate-Triggered Architecture is Ultra-Fast**: The confirmation gate operates strictly on candidate intervals rather than dense all-frame processing. Evaluating all five confirmation signals requires only **$1.52\,\text{ms}$ to $3.29\,\text{ms}$ per candidate** on standard CPU ($> 300-650$ candidates/sec), adding virtually zero measurable latency ($0.15\,\text{s}$ total across the entire evaluation benchmark).
-2. **Kinematic Coupling Suppresses Negative False Alarms**: Hand-to-region relative motion coupling (`relative_motion`) proved to be the most effective discriminator against ordinary non-manipulation behavior, rejecting **$80.0\%$** of negative control false alarms (false pickups dropped from $4 \to 1$, false placements dropped from $1 \to 0$) because clasped hands and pocket-resting hands exhibit near-zero velocity acceleration vectors relative to body transit.
-3. **Appearance Change Validates Placements but Penalizes Small Pickups**: Local appearance difference (`appearance_change`) achieves **$50.0\%$ precision** on placement events by capturing the persistent visual artifact left when an object is placed on a table or ground. However, on pickups of sub-40px items (phones, keys, pens), no discernible pixel delta is visible at 2 FPS standoff surveillance, collapsing pickup recall from $53.33\% \to 26.67\%$ (and $9.09\%$ on sub-40px cases).
-4. **Resolution Dichotomy**: On higher-resolution interactions ($\ge 40\text{px}$ width), confirmed pickup recall remains robust at **$75.0\%$** (3/4) and placement recall at **$60.0\%$** (3/5). On sub-40px ambiguous objects, pickup recall collapses to **$9.09\% - 36.36\%$**, confirming that camera standoff distance and compression noise impose a physical resolution boundary.
-5. **Final Decision**: **C — Partial improvement**. The gate helps substantially under specific conditions (placement events, higher-resolution items, motion-coupling rejection of stationary hands), but does not overcome the fundamental visual ambiguity of tiny handheld objects.
-6. **Production Gate**: **PRODUCTION CHANGE: NO**. Production remains strictly frozen at commit `89dc216`.
+## Corrected experiment and leakage boundary
 
----
+[`scripts/experiment_meva_confirmation_unbiased.py`](../scripts/experiment_meva_confirmation_unbiased.py) has two separate commands. `extract` reads the manifest, the frozen `improved-2fps/vigilia.db` person tracks, the source videos, and YOLO11n-pose weights. It runs over **every sampled frame with a stored person track in all eight videos**. It does not open the MEVA activity annotations or `object-eval/cases.json`. Runtime person boxes generate the interaction ROIs. The 1.0-second persistence candidate generator and confirmation feature implementation from `89dc216`/`cd7b7d4` are reused unchanged.
 
-## 2. Previous Frozen Baseline
+Only after the extraction artifact is closed does `evaluate` read the 30 selected MEVA manipulation annotations and actor geometry. It assigns candidates one-to-one by same video, pickup/placement type, temporal IoU ≥0.1 **or both endpoints within ±2 seconds**, and annotated-person/runtime-person box IoU ≥0.1 at a common source frame. The gate never sees the labels. The same 155 candidates and feature vectors are used for all ablations and thresholds. The ten negative-control windows are inspected only after extraction; none overlaps an annotated pickup/placement interval. Because no object box or object track is established, matching a candidate to an annotation is an **upper bound on manipulation recognition**, not proof of object handling.
 
-The production baseline remains strictly frozen:
+The eight videos yielded 1,624 sampled frames with stored people, 7,330 pose crops, and 155 upstream candidates (92 pickup-like, 63 placement-like). Some videos had no stored person observations, which is a perception/track limitation rather than an excluded GT case. All 15 pickup and 15 placement annotations remain in the denominator.
 
-| Metric | Production Baseline (`89dc216`) |
-| :--- | :---: |
-| **Detector** | YOLO11n (`640px`, conf `0.30`, ByteTrack, 2 FPS) |
-| **DIRECT GT Activities** | 89 |
-| **DIRECT Predictions** | 17 |
-| **DIRECT Temporal Matches** | 8 |
-| **Precision** | 47.06% |
-| **Recall** | 8.99% |
-| **Mean Temporal IoU** | 0.5976 |
-| **Vehicle Starts** | 3 / 32 (9.38%) |
-| **Vehicle Stops** | 5 / 27 (18.52%) |
-| **Pickups** | 0 / 15 (0.00%) |
-| **Placements** | 0 / 15 (0.00%) |
-| **Evidence Chains Valid** | 2,443 / 2,443 (100.0%) |
-| **Test Suite Baseline** | 104 passed |
+## Confirmation features and what they actually measure
 
----
+| Feature | Measurement | Limitation |
+|---|---|---|
+| Localized motion | Pixel difference in a hand-centered interaction box relative to body pixel difference | Camera/body motion and shadows can dominate; not object motion. |
+| Relative motion | Smoothness of **absolute wrist displacement** across observations | Despite the name, current code does not subtract body/region velocity or establish object coupling. |
+| Appearance change | Pre/post pixel difference at the last hand-centered region | A person leaving, shadow, or lighting shift can look like a changed object. |
+| Region persistence | IoU of successive wrist-centered interaction boxes | Coherent hand ROIs do not imply a persistent physical object. |
+| Separation | Post-interval wrist displacement from its final position, normalized by person height | A hand withdrawing does not establish release or an object left behind. |
 
-## 3. Upstream Hand-Contact Baseline (`89dc216`)
+The scorer is a transparent weighted sum: `best_two = 0.4 × appearance + 0.6 × separation`; `best_three = 0.25 × localized motion + 0.35 × appearance + 0.4 × separation`; `all = 0.20 × localized motion + 0.15 × relative motion + 0.25 × appearance + 0.15 × persistence + 0.25 × separation`. No learned model or MEVA-trained threshold is used. Features and source observations are retained per candidate in the ignored local artifact.
 
-The upstream candidate generator evaluated in commit `89dc216` used:
-- Architecture: `YOLO11n-pose`
-- ROI Strategy: `interaction_region` (factor 1.25)
-- Persistence Threshold: $1.0\,\text{s}$
-- Contact Probability Threshold: $0.45$
+## Full-video ablation at confirmation threshold 0.45
 
-| Metric | Hand-Contact Baseline (`89dc216`) |
-| :--- | :---: |
-| **Person Coverage** | 30 / 30 (100.0%) |
-| **Hand / Wrist Coverage** | 30 / 30 (100.0%) |
-| **Persistent Contact Cases** | 24 / 30 (80.0%) |
-| **Pickup GT Cases** | 15 |
-| **Pickup Candidates Emitted** | 22 |
-| **Pickup Matched Cases** | 9 / 15 |
-| **Pickup Recall** | 60.00% |
-| **Pickup Precision** | 34.62% |
-| **Placement GT Cases** | 15 |
-| **Placement Candidates Emitted** | 18 |
-| **Placement Matched Cases** | 9 / 15 |
-| **Placement Recall** | 60.00% |
-| **Placement Precision** | 47.37% |
-| **Negative Controls (10 windows)** | 4 false pickups, 1 false placement |
+`P` is one-to-one matches divided by all emitted candidates of that type across eight videos; `R` is matches divided by 15 GT events. Negative counts are confirmed candidates in ten verified non-manipulation windows. These are false candidate counts, **not** a false-positive rate with an assumed true-negative denominator.
 
-*Limitation Established*: The signal verified persistent hand proximity to an interaction zone, but could not verify physical object engagement, admitting false candidates during clasped hands and waistline adjustments.
+| Gate | Pickup cand. | Pickup matches | Pickup P / R | Placement cand. | Placement matches | Placement P / R | Negative pickup / placement |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Upstream pass-through | 92 | 2 | 2.2% / 13.3% | 63 | 3 | 4.8% / 20.0% | 4 / 2 |
+| Localized motion | 43 | 2 | 4.7% / 13.3% | 29 | 0 | 0% / 0% | 3 / 2 |
+| Relative motion | 37 | 1 | 2.7% / 6.7% | 20 | 2 | 10.0% / 13.3% | 1 / 0 |
+| Appearance change | 34 | 1 | 2.9% / 6.7% | 24 | 2 | 8.3% / 13.3% | 3 / 2 |
+| Separation | 42 | 2 | 4.8% / 13.3% | 34 | 3 | 8.8% / 20.0% | 2 / 1 |
+| Appearance + separation | 40 | 2 | 5.0% / 13.3% | 34 | 3 | 8.8% / 20.0% | 3 / 1 |
+| Motion + appearance + separation | 42 | 2 | 4.8% / 13.3% | 35 | 3 | 8.6% / 20.0% | 4 / 2 |
+| All five | 46 | 2 | 4.3% / 13.3% | 37 | 3 | 8.1% / 20.0% | 3 / 2 |
 
----
+The best recall-preserving *exploratory* choice is appearance + separation at 0.45; it reduces all-video candidates from 155 to 74, but 69/74 remain unmatched to these 30 GT events. Relative-motion-only rejects 5/6 negative-window candidates, but loses one of two pickup matches and one of three placement matches. No tested gate makes the candidates defensible as physical manipulation evidence.
 
-## 4. Confirmation Features
+## Threshold trade-off for all five signals
 
-The secondary confirmation module ([backend/meva/manipulation_confirmation.py](file:///Users/yanalavivekreddy/VIGILIA/backend/meva/manipulation_confirmation.py)) computes five deterministic visual/temporal confirmation features:
+| Threshold | Pickup candidates / matches | Placement candidates / matches | Negative pickup / placement |
+|---:|---:|---:|---:|
+| 0.35 | 66 / 2 | 50 / 3 | 4 / 2 |
+| 0.40 | 58 / 2 | 44 / 3 | 3 / 2 |
+| 0.45 | 46 / 2 | 37 / 3 | 3 / 2 |
+| 0.50 | 40 / 2 | 33 / 3 | 3 / 2 |
+| 0.55 | 34 / 2 | 24 / 2 | 2 / 1 |
+| 0.60 | 23 / 2 | 17 / 2 | 1 / 1 |
 
-```
-Upstream Candidate Interval [t_start, t_end]
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Localized Motion (ratio of inter-region vs body diff)     │
-│ 2. Relative Motion Coupling (vector acceleration stability) │
-│ 3. Temporal Appearance Change (pre vs post patch delta)     │
-│ 4. Region Spatial Persistence (IoU bounding box stability)  │
-│ 5. Separation Evidence (post-event hand withdrawal)         │
-└─────────────────────────────────────────────────────────────┘
-                     ↓
-       Interpretable Weighted Scoring
-                     ↓
-         CONFIRMED / WEAK / REJECTED
-```
+Tighter filtering improves the candidate fraction only by discarding many unmatched hypotheses; it does not recover missed real interactions. The local `confirmation-unbiased-results.json` includes sweeps for the two- and three-signal combinations and strict ±1/±2/±3-second endpoint diagnostics.
 
-### Feature Definitions
-1. **Localized Motion ($S_{\text{motion}} \in [0.0, 1.0]$)**:
-   Measures absolute frame difference within the interaction region relative to whole-body motion. High whole-body motion (e.g. running/walking, average body pixel difference $> 35$) is penalized, while isolated hand motion against a stationary body is rewarded.
-2. **Relative Motion Coupling ($S_{\text{coupling}} \in [0.0, 1.0]$)**:
-   Measures the kinematic consistency of hand displacement vectors across consecutive sampled frames. Jerky flailing or stationary hand holding produces either high acceleration variance or near-zero displacement; smooth coordinated motion with the body achieves high coupling scores.
-3. **Temporal Appearance Change ($S_{\text{appear}} \in [0.0, 1.0]$)**:
-   Compares local video patches at the interaction site between pre-event ($t < t_{\text{start}}$) and post-event ($t > t_{\text{end}}$) frames. Measures pixel luminance difference and texture variance without relying on full-frame illumination changes.
-4. **Region Persistence ($S_{\text{persist}} \in [0.0, 1.0]$)**:
-   Measures bounding-box spatial overlap (IoU) of the candidate interaction region across active candidate frames, filtering out single-frame tracking glitches.
-5. **Separation Evidence ($S_{\text{sep}} \in [0.0, 1.0]$)**:
-   Tracks hand position in the 1.5-second post-event window ($t_{\text{end}} \to t_{\text{end}} + 1.5\,\text{s}$). If the hand pulls away from the anchor interaction site (normalized separation $> 0.15$ of person height), separation evidence is established. Hands remaining glued to the torso (e.g., clasped hands) receive low scores ($< 0.10$).
+## Pickup, placement, and resolution
 
----
+The full-video upstream produces only 2/15 pickup and 3/15 placement matches under one-to-one temporal/person matching. The appearance + separation gate retains those five matches. Its matched mean temporal IoU is 0.4439 for pickups and 0.4976 for placements. Of the 11 GT pickups with sub-40px object width, only one matches; one of four larger-object pickups matches. Of the ten sub-40px placements, two match; one of five larger placements matches. This tiny sample does **not** support a reliable resolution-specific effect: both groups are weak. The original GT-centered pilot overstated detectability in both groups.
 
-## 5. Ablation Results
+The ten negative windows emit six upstream candidates (four pickup-like, two placement-like). Appearance + separation keeps four (three pickup-like, one placement-like), rejecting 2/6. Relative motion keeps one (one pickup-like), rejecting 5/6, but also sacrifices true matches. These controls cover only ten short windows and should not be generalized into a world-wide false-positive rate.
 
-We evaluated each feature independently and in controlled combinations at confirmation threshold $\tau = 0.45$:
+## Runtime and evidence integrity
 
-| Experiment / Mode | Pickup Candidates | Pickup Matched | Pickup Recall | Pickup Precision | Mean IoU | Placement Candidates | Placement Matched | Placement Recall | Placement Precision | Mean IoU | Neg False Pickups | Neg False Placements | Neg Rejection Rate | Avg Latency (ms) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Baseline** (Pass-through) | 64 | 8 | 53.33% | 11.76% | 0.3680 | 32 | 8 | 53.33% | 24.24% | 0.4515 | 4 | 1 | 0.0% | 0.00 |
-| **Exp 1: Localized Motion** | 31 | 7 | 46.67% | 20.59% | 0.3508 | 17 | 6 | 40.00% | 33.33% | 0.2663 | 3 | 1 | 20.0% | 3.29 |
-| **Exp 2: Relative Motion** | 30 | 6 | 40.00% | 19.35% | 0.2463 | 19 | 6 | 40.00% | 31.58% | 0.2314 | 1 | 0 | **80.0%** | 2.03 |
-| **Exp 3: Appearance Change**| 18 | 4 | 26.67% | 19.05% | 0.4167 | 11 | 6 | 40.00% | **50.00%** | 0.5096 | 3 | 1 | 20.0% | 1.94 |
-| **Exp 4: Separation Evidence**| 27 | 6 | 40.00% | 20.69% | 0.3747 | 15 | 7 | 46.67% | 43.75% | 0.4166 | 2 | 1 | 40.0% | 1.56 |
-| **Exp 5: Best Two** (Appear+Sep) | 21 | 3 | 20.00% | 12.50% | 0.5043 | 15 | 7 | 46.67% | 43.75% | 0.4166 | 3 | 1 | 20.0% | 1.53 |
-| **Exp 6: Best Three** (Motion+Appear+Sep) | 25 | 5 | 33.33% | 17.24% | 0.3026 | 14 | 7 | 46.67% | 46.67% | 0.4166 | 4 | 1 | 0.0% | 1.53 |
-| **Exp 7: All Signals** | 35 | 7 | 46.67% | 18.42% | 0.3456 | 22 | 8 | 53.33% | 34.78% | 0.4295 | 3 | 1 | 20.0% | 1.52 |
+On this host, full-video extraction took **289.97 seconds** for 7,330 pose crops. Feature computation alone took **0.549 seconds** for 155 candidates, about **3.54 ms/candidate**; this excludes video seek/decode and pose inference. Total incremental confirmation I/O cost and peak memory were not separately measured, so no memory or generalized latency claim is made. The evaluator's post-hoc annotation parsing and matching are outside runtime inference.
 
----
+Every extracted candidate records video ID, camera, source SHA-256, track ID, source start/end frames and seconds, person boxes, supporting observations, and the five feature values. These are **evaluation candidates**, not persisted application events: they have no event/evidence IDs or API evidence chain. The frozen production run previously measured 2,443/2,443 valid evidence chains; this experiment does not change or newly remeasure that production result. An explanatory claim may say *“pickup-like hand interaction with local appearance change and wrist separation”*; it cannot say an object was grasped, carried, or placed.
 
-## 6. Pickup Evaluation & Threshold Sweep
+## Main failure modes and recommendation
 
-Evaluating pickup candidates separately demonstrates how filtering affects pickup events across thresholds:
+1. GT-windowed pilot selection produced optimistic counts; full-video inference exposes many ordinary hand actions.
+2. The upstream wrist/interaction-region state machine emits candidates without detecting a physical object.
+3. Each secondary feature largely measures hand or person behavior, not independent object continuity. Shadows, occlusion, and camera motion confound local pixels.
+4. Small and ambiguous objects remain unresolved at the source resolution. Even larger-object cases are weak in this full-video evaluation.
+5. More restrictive thresholds reduce candidate volume but do not create missing object evidence.
 
-| Mode & Threshold | Emitted / Kept | Matched | Recall | Precision | Mean Temporal IoU | Matched $\pm 1$s | Matched $\pm 2$s | Matched $\pm 3$s |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Baseline** | 64 | 8 | 53.33% | 11.76% | 0.3680 | 10 | 17 | 27 |
-| **All ($\tau = 0.35$)** | 49 | 8 | 53.33% | 15.09% | 0.3680 | 10 | 14 | 22 |
-| **All ($\tau = 0.40$)** | 42 | 7 | 46.67% | 15.56% | 0.4130 | 8 | 11 | 17 |
-| **All ($\tau = 0.45$)** | 35 | 7 | 46.67% | 18.42% | 0.3456 | 7 | 10 | 15 |
-| **All ($\tau = 0.50$)** | 27 | 7 | 46.67% | 23.33% | 0.3456 | 6 | 8 | 11 |
-| **All ($\tau = 0.55$)** | 24 | 6 | 40.00% | 23.08% | 0.4003 | 5 | 7 | 9 |
-| **All ($\tau = 0.60$)** | 16 | 4 | 26.67% | 23.53% | 0.3782 | 3 | 4 | 6 |
+**Do not integrate the gate into production.** The highest-leverage next step is a controlled object-presence and continuity study on cameras/clips where an object is visibly resolvable, with runtime-only crops and a held-out evaluation set. Until an object can be independently observed and associated across the transition, VIGILIA should abstain from pickup/placement assertions.
 
-*Observation*: As threshold rises from $0.35 \to 0.60$, candidate count drops from $49 \to 16$, reducing false hypotheses, but recall drops from $53.33\% \to 26.67\%$.
+## Reproduction
 
----
+From `/Users/yanalavivekreddy/VIGILIA` with the already-downloaded MEVA data and frozen processed DB:
 
-## 7. Placement Evaluation & Threshold Sweep
-
-Placement candidates benefit significantly more from the confirmation gate:
-
-| Mode & Threshold | Emitted / Kept | Matched | Recall | Precision | Mean Temporal IoU | Matched $\pm 1$s | Matched $\pm 2$s | Matched $\pm 3$s |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Baseline** | 32 | 8 | 53.33% | 24.24% | 0.4515 | 11 | 17 | 21 |
-| **All ($\tau = 0.35$)** | 29 | 8 | 53.33% | 26.67% | 0.4515 | 10 | 16 | 18 |
-| **All ($\tau = 0.40$)** | 26 | 8 | 53.33% | 29.63% | 0.4295 | 9 | 15 | 17 |
-| **All ($\tau = 0.45$)** | 22 | 8 | 53.33% | 34.78% | 0.4295 | 9 | 12 | 14 |
-| **All ($\tau = 0.50$)** | 21 | 8 | 53.33% | 36.36% | 0.4295 | 9 | 12 | 14 |
-| **All ($\tau = 0.55$)** | 16 | 7 | 46.67% | 41.18% | 0.2858 | 6 | 9 | 11 |
-| **All ($\tau = 0.60$)** | 10 | 6 | 40.00% | **54.55%** | 0.2468 | 4 | 7 | 7 |
-
-*Observation*: Placement maintains full baseline recall ($8/15 = 53.33\%$) up to $\tau = 0.50$ while pruning candidates from $32 \to 21$ and lifting precision from $24.24\% \to 36.36\%$. At $\tau = 0.60$, precision reaches $54.55\%$.
-
----
-
-## 8. Controlled Negative Evaluation
-
-Evaluating 10 controlled non-manipulation surveillance windows (walking plaza, group conversation, bus stop standing, crosswalk transit, corridor transit, parking lot walking):
-
-| Mode | False Pickups | False Placements | Rejected Candidates | Rejection Rate (%) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Baseline** | 4 | 1 | 0 / 5 | 0.0% |
-| **Localized Motion** | 3 | 1 | 1 / 5 | 20.0% |
-| **Relative Motion Coupling** | **1** | **0** | **4 / 5** | **80.0%** |
-| **Appearance Change** | 3 | 1 | 1 / 5 | 20.0% |
-| **Separation Evidence** | 2 | 1 | 2 / 5 | 40.0% |
-| **All ($\tau = 0.50$)** | 3 | 1 | 1 / 5 | 20.0% |
-| **All ($\tau = 0.60$)** | 1 | 1 | 3 / 5 | 60.0% |
-
-*Key Insight*: Relative motion coupling (`Exp 2`) achieves the highest rejection rate ($80.0\%$). Ordinary arm movement and gesturing fail to maintain smooth kinematic coupling with the interaction anchor.
-
----
-
-## 9. Resolution Breakdown Analysis
-
-We partitioned cases into higher-resolution ($\ge 40\text{px}$ width) versus sub-40px ambiguous object cases:
-
-| Target Activity & Visual Difficulty | GT Cases | Baseline Recall | All ($\tau = 0.45$) Recall | All ($\tau = 0.55$) Recall | All ($\tau = 0.60$) Recall |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Pickup — High-Resolution ($\ge 40$px)** | 4 | 3 / 4 (**75.0%**) | 3 / 4 (**75.0%**) | 3 / 4 (**75.0%**) | 2 / 4 (**50.0%**) |
-| **Pickup — Sub-40px Ambiguous Object** | 11 | 5 / 11 (45.45%) | 4 / 11 (36.36%) | 3 / 11 (27.27%) | 2 / 11 (**18.18%**) |
-| **Placement — High-Resolution ($\ge 40$px)** | 5 | 3 / 5 (**60.0%**) | 3 / 5 (**60.0%**) | 3 / 5 (**60.0%**) | 2 / 5 (**40.0%**) |
-| **Placement — Sub-40px Ambiguous Object** | 10 | 5 / 10 (50.0%) | 5 / 10 (50.0%) | 4 / 10 (40.0%) | 4 / 10 (**40.0%**) |
-
-### Resolution Interpretation
-- **High-Resolution Cases**: The secondary confirmation gate preserves high recall ($75\%$ pickup, $60\%$ placement) while stripping away spurious hypothesis candidates.
-- **Sub-40px Cases**: Confirmation signals that inspect local pixel appearance collapse on small objects. An object occupying $8 \times 12$ pixels leaves less than 2-3 average intensity delta against background concrete or asphalt in H.264 compressed 1080p surveillance video. Requiring strong visual appearance confirmation inevitably suppresses valid sub-40px manipulation events.
-
----
-
-## 10. Runtime Profiling
-
-| Stage | Latency | Unit |
-| :--- | :---: | :---: |
-| **Upstream Pose Inference** (YOLO11n-pose, crop) | 25.05 ms | per crop |
-| **Candidate Feature Computation** (All 5 signals) | **1.52 ms** | per candidate |
-| **Gate Decision & Scorer** | **0.01 ms** | per candidate |
-| **Total Confirmation Time Across Benchmark** | **0.153 s** | 101 candidates |
-| **Throughput** | **~650** | candidates / sec (CPU) |
-| **Memory Overhead** | $< 15\,\text{MB}$ | working buffer |
-
-*Validation*: Because confirmation runs strictly when triggered by upstream persistent interaction candidates (averaging $< 3$ candidates per 30-second window), the CPU cost is negligible compared to dense frame detection.
-
----
-
-## 11. Failure Analysis
-
-1. **Walking with Hand at Waist**: When a pedestrian walks with one hand resting on a belt or backpack strap, the hand stays persistently in the anatomical interaction zone. Whole-body motion is high, but relative hand-body acceleration is low. If the pedestrian stops briefly to talk, local motion and coupling simulate an interaction event.
-2. **Sub-40px Pickup Disappearance**: In case `MEVA-G331-20180315-1555:0:3` (person picks up small badge from ground), the hand reaches down, interacts for 1.2s, and lifts. Because the badge is $< 15$ pixels wide, the appearance change score is only $0.08$. Stricter gates reject this true positive.
-3. **Occlusion During Hand Separation**: In crowded outdoor scenes (`MEVA-G421`), another pedestrian walking past during the release phase breaks the tracking of the hand box, causing separation distance to be underestimated ($S_{\text{sep}} = 0.12$).
-4. **Surface Shadows and Lighting**: When a person bends over, their own body shadow falls across the interaction zone, generating a false appearance change delta of 8-12 intensity levels even when no physical object was moved.
-
----
-
-## 12. Evidence-Grounding Semantics
-
-Every confirmed candidate emitted by the gate produces an auditable, transparent evidence chain with conservative semantic claims:
-
-```
-Candidate: Placement [cand_014_person_puts_down_object]
-Status: CONFIRMED (Score: 0.58)
-Duration: 1.50s (Frames: 420–426, Video: MEVA-G331-20180315-1555)
-Auditable Evidence:
-  - Upstream Hand Interaction: Right wrist localized (conf: 0.78), persistent 1.50s
-  - Localized Motion: S_motion = 0.52 (inter_diff=14.2, body_diff=12.1)
-  - Relative Motion Coupling: S_coupling = 0.65 (smooth velocity profile)
-  - Appearance Change: S_appear = 0.61 (local patch delta=14.8 intensity levels)
-  - Region Persistence: S_persist = 0.72 (mean overlap IoU=0.51)
-  - Post-Event Separation: S_sep = 0.54 (hand displaced 38.2px / 0.19 body heights)
+```bash
+export MEVA_ROOT="$HOME/VIGILIA_DATA"
+.venv/bin/python scripts/experiment_meva_confirmation_unbiased.py extract
+.venv/bin/python scripts/experiment_meva_confirmation_unbiased.py evaluate
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -q -p no:cacheprovider tests
+.venv/bin/ruff check --no-cache scripts/experiment_meva_confirmation_unbiased.py tests/test_meva_confirmation_unbiased.py backend/meva/manipulation_confirmation.py tests/test_manipulation_confirmation.py
+PYTHONPYCACHEPREFIX=/tmp/vigilia-pycache .venv/bin/python -m compileall -q backend tests scripts
 ```
 
-The system claims:
-*"Placement-like interaction candidate supported by persistent hand interaction, localized motion, persistent appearance delta, and post-interaction separation."*
-The system **never** claims:
-*"Person placed a bottle / backpack"* unless the object itself was semantically resolved.
-
----
-
-## 13. Strict No-Leakage Verification
-
-1. **Zero Ground-Truth Feature Injection**: No MEVA ground-truth actor IDs, bounding boxes, timestamps, or action labels were accessed during candidate generation, visual cropping, or feature computation.
-2. **Runtime Sources Only**: All candidates and features were computed solely from raw decoded MP4 frames, runtime `vigilia.db` person tracks, and runtime `YOLO11n-pose` keypoints.
-3. **Post-Hoc Scoring Isolation**: Ground-truth activity timestamps were consulted strictly in the final evaluation pass after candidates were scored and emitted.
-
----
-
-## 14. Final Recommendation & Production Gate
-
-### Honest Decision: **C — Partial improvement**
-The secondary confirmation gate provides meaningful discriminative utility:
-- Doubles placement precision (up to $50.0\%-54.5\%$) via appearance change and separation evidence.
-- Prunes false alarms on negative controls by $80.0\%$ using relative motion coupling.
-- Operates at near-zero CPU cost ($1.5\,\text{ms}$ per candidate).
-
-However, it **does not solve the fundamental ambiguity** of sub-40px handheld objects:
-- For objects $< 40$px, optical flow and local appearance deltas fall below sensor and compression noise floors. Tightening the confirmation threshold causes pickup recall to collapse ($45.4\% \to 18.2\%$).
-
-### Production Integration Decision: **NO**
-Production remains **frozen** at commit `89dc216` (YOLO11n, 640px, conf 0.30, ByteTrack, 2 FPS). The secondary gate is maintained as an isolated evaluation module for high-resolution cameras and selective placement auditing.
+The two generated JSON files live in ignored `data/meva/`: `confirmation-full-video-candidates.json` and `confirmation-unbiased-results.json`. Raw footage and generated artifacts are not committed. `tests/test_meva_confirmation_unbiased.py` protects actor-grounded, one-to-one, endpoint-tolerant matching. The 30 labels are a selected development set, not a held-out accuracy estimate. No tuning result here should be marketed as real-world activity-recognition accuracy.
