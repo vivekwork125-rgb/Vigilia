@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "purpose": "post-inference evaluation only; never used for crops, detections, association, or thresholds",
+  "review_source": [
+    "data/meva/perception-experiment/pickup-object-sheet.jpg",
+    "data/meva/perception-experiment/placement-object-sheet.jpg",
+    "data/meva/object-eval/cases.json"
+  ],
+  "limitations": "Single selected source-frame visual review; no verified continuous visibility. Unknown and difficult cases remain in total denominator. Labels do not certify semantic class or physical identity.",
+  "cases": [
+    {
+      "annotation_key": "MEVA-G331-20180315-1555:0:0",
+      "visibility": "CLEARLY_VISIBLE",
+      "approx_width_px": 77.0,
+      "approx_height_px": 89.5,
+      "visual_review": "Visible item on table/hand; class ambiguous from this frame",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:13:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 26.0,
+      "approx_height_px": 38.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:14:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 28.0,
+      "approx_height_px": 42.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:15:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 26.0,
+      "approx_height_px": 36.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:16:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 23.5,
+      "approx_height_px": 35.5,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:17:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 24.0,
+      "approx_height_px": 34.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:18:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 25.0,
+      "approx_height_px": 35.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:19:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 26.0,
+      "approx_height_px": 38.5,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:20:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 24.0,
+      "approx_height_px": 36.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:21:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 24.0,
+      "approx_height_px": 34.5,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:22:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 25.0,
+      "approx_height_px": 35.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:23:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 23.5,
+      "approx_height_px": 33.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:34:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 55.0,
+      "approx_height_px": 45.5,
+      "visual_review": "Dark item against clothing/furniture; partly occluded; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:35:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 46.0,
+      "approx_height_px": 49.0,
+      "visual_review": "Dark item against clothing/furniture; partly occluded; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:36:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 56.0,
+      "approx_height_px": 45.0,
+      "visual_review": "Dark item against clothing/furniture; partly occluded; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:38:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 62.0,
+      "approx_height_px": 30.0,
+      "visual_review": "Dark item against clothing/furniture; partly occluded; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:39:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 63.0,
+      "approx_height_px": 34.0,
+      "visual_review": "Dark item against clothing/furniture; partly occluded; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:43:0",
+      "visibility": "SMALL_POTENTIALLY_RESOLVABLE",
+      "approx_width_px": 22.0,
+      "approx_height_px": 36.0,
+      "visual_review": "Small bright bottle/cup-like item near hand/table; exact class uncertain",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:49:0",
+      "visibility": "SMALL_POTENTIALLY_RESOLVABLE",
+      "approx_width_px": 19.0,
+      "approx_height_px": 26.5,
+      "visual_review": "Small bright bottle/cup-like item near hand/table; exact class uncertain",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:4:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 29.5,
+      "approx_height_px": 38.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:58:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 91.0,
+      "approx_height_px": 79.0,
+      "visual_review": "Low-contrast item near counter/table; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:59:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 85.0,
+      "approx_height_px": 60.0,
+      "visual_review": "Low-contrast item near counter/table; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:5:0",
+      "visibility": "PARTIALLY_OCCLUDED",
+      "approx_width_px": 30.0,
+      "approx_height_px": 38.0,
+      "visual_review": "Small cup/can-like item in or near hand; partly covered by hand",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:60:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 58.0,
+      "approx_height_px": 85.0,
+      "visual_review": "Low-contrast item near counter/table; exact class ambiguous",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:64:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 24.5,
+      "approx_height_px": 40.5,
+      "visual_review": "Small handheld item at bright window; partial/low contrast",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:65:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 25.0,
+      "approx_height_px": 37.0,
+      "visual_review": "Small handheld item at bright window; partial/low contrast",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:67:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 25.0,
+      "approx_height_px": 36.0,
+      "visual_review": "Small handheld item at bright window; partial/low contrast",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:68:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 24.0,
+      "approx_height_px": 33.0,
+      "visual_review": "Small handheld item at bright window; partial/low contrast",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G421-20180315-1555:70:0",
+      "visibility": "UNKNOWN",
+      "approx_width_px": 23.0,
+      "approx_height_px": 34.0,
+      "visual_review": "Small handheld item at bright window; partial/low contrast",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    },
+    {
+      "annotation_key": "MEVA-G638-20180315-1555:15:0",
+      "visibility": "SEVERELY_OCCLUDED_OR_BLURRED",
+      "approx_width_px": 21.0,
+      "approx_height_px": 25.0,
+      "visual_review": "Small bright item near person; distant and partly occluded",
+      "consecutive_sample_visibility": "UNVERIFIED",
+      "review_basis": "source-frame contact sheet plus prior human note",
+      "uncertainty": "semantic object class not verified"
+    }
+  ]
+}
