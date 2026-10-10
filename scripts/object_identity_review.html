@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VIGILIA · Object identity review</title>
+<style>
+  :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+  body { margin: 0; background: #111923; color: #edf2f7; }
+  header { padding: 12px 20px; background: #1e2c3a; display: flex; align-items: center; gap: 20px; }
+  h1 { font-size: 1.2rem; margin: 0; } small { color: #a8bbca; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; padding: 14px; }
+  .viewer, aside { background: #1b2835; border: 1px solid #405164; border-radius: 7px; padding: 12px; }
+  canvas { width: 100%; height: auto; display: block; cursor: crosshair; background: #000; }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  label { display: block; font-size: .83rem; color: #c6d3de; margin-bottom: 3px; }
+  select, input, textarea, button { box-sizing: border-box; background: #263749; border: 1px solid #61778b; border-radius: 4px; color: #fff; padding: 7px; font: inherit; }
+  button { cursor: pointer; } button:hover { background: #39536c; }
+  button.primary { background: #0c7665; border-color: #36b39c; }
+  button.danger { background: #6c2c33; border-color: #b45761; }
+  aside > div { margin-bottom: 9px; }
+  aside input, aside select, aside textarea { width: 100%; }
+  #objects button { font-size: .78rem; padding: 4px 7px; }
+  .item { padding: 6px; border-bottom: 1px solid #405164; }
+  #status { color: #aee9d4; min-height: 22px; }
+  @media(max-width: 900px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><h1>VIGILIA · manual object identity review</h1><small>Source video only · no detector proposals</small></header>
+<main>
+  <section class="viewer">
+    <div class="row"><label for="clip">Clip</label><select id="clip"></select>
+      <button id="prev">← Previous</button><button id="next">Next →</button>
+      <strong id="frameLabel"></strong></div>
+    <canvas id="canvas" aria-label="Source frame; drag to draw an object box"></canvas>
+    <p>Drag on the source frame to draw a box. Existing reviewed boxes are green; the current draft is yellow. Boxes are stored in the original source-frame coordinates.</p>
+    <div id="objects"></div>
+  </section>
+  <aside>
+    <div><label for="identity">Physical object ID</label><select id="identity"></select></div>
+    <div class="row"><button id="newId">Create new ID</button><button id="uncertainId">Uncertain new ID</button></div>
+    <div><label for="classLabel">Class</label><select id="classLabel">
+      <option>unknown_object</option><option>other_visible_object</option><option>person</option>
+      <option>vehicle</option><option>bag</option><option>bottle</option><option>cup</option><option>phone</option>
+    </select></div>
+    <div><label for="visibility">Visibility</label><select id="visibility">
+      <option>visible</option><option>partially_visible</option><option>occluded</option>
+      <option>not_visible</option><option>uncertain</option>
+    </select></div>
+    <div><label for="occlusion">Occlusion</label><select id="occlusion">
+      <option>none</option><option>partial</option><option>heavy</option><option>uncertain</option>
+    </select></div>
+    <div><label for="confidence">Identity confidence</label><select id="confidence">
+      <option>high</option><option>medium</option><option>uncertain</option>
+    </select></div>
+    <div><label for="annotationNote">Object / identity note</label><textarea id="annotationNote" rows="2"></textarea></div>
+    <div><label for="reidNote">Re-identification note after a gap</label><input id="reidNote" placeholder="Required when reusing an ID after disappearance"></div>
+    <div class="row"><button id="addObject">Add / update object</button><button id="clearDraft">Clear draft</button></div>
+    <hr>
+    <div><label for="reviewState">Frame review state</label><select id="reviewState"><option>partial</option><option>complete</option></select></div>
+    <div><label for="reviewNote">Frame review note</label><input id="reviewNote" placeholder="EMPTY_SCENE_CONFIRMED for complete empty frames"></div>
+    <button class="primary" id="saveFrame">Save frame</button>
+    <p id="status" role="status"></p>
+    <small>Save each frame before navigating. Partial means the object inventory is not exhaustive; only complete reviewed frames may enter future precision evaluation.</small>
+  </aside>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let clips = [], identities = {}, clip = null, framePosition = 0, record = null;
+let photo = new Image(), draft = null, dragging = null, editing = -1, dirty = false;
+const canvas = $('canvas'), ctx = canvas.getContext('2d');
+async function api(url, options) { const r = await fetch(url, options); const body = await r.json(); if (!r.ok) throw new Error(body.error || r.status); return body; }
+function status(message, error=false) { $('status').textContent = message; $('status').style.color = error ? '#ff9ca6' : '#aee9d4'; }
+function currentFrame() { return clip.frame_indices[framePosition]; }
+function coordinates(event) { const rect=canvas.getBoundingClientRect(); return [Math.round((event.clientX-rect.left)*canvas.width/rect.width), Math.round((event.clientY-rect.top)*canvas.height/rect.height)]; }
+function drawBox(box, color) { if (!box) return; ctx.strokeStyle=color; ctx.lineWidth=3; ctx.strokeRect(box[0],box[1],box[2]-box[0],box[3]-box[1]); }
+function redraw() {
+  if (!photo.complete || !photo.naturalWidth) return;
+  canvas.width=photo.naturalWidth; canvas.height=photo.naturalHeight; ctx.drawImage(photo,0,0);
+  (record?.annotations || []).forEach(a => drawBox(a.bbox_xyxy,'#38e2a7'));
+  drawBox(draft,'#ffe16b');
+}
+function updateIdentityOptions() {
+  const selected=$('identity').value;
+  const ids=new Set([...(identities[clip.clip_id]||[]),...(record?.annotations||[]).map(a=>a.object_id)]);
+  $('identity').replaceChildren(...[...ids].sort().map(id=>new Option(id,id)));
+  if (ids.has(selected)) $('identity').value=selected;
+}
+function listObjects() {
+  const container=$('objects'); container.replaceChildren();
+  (record?.annotations||[]).forEach((a,index)=>{
+    const row=document.createElement('div');row.className='item';
+    const text=document.createElement('span');text.textContent=`${a.object_id} · ${a.class_label} · ${a.visibility} ${a.bbox_xyxy ? a.bbox_xyxy.map(Math.round).join(',') : '(absent)'}`;
+    const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>{
+      editing=index;draft=a.bbox_xyxy ? [...a.bbox_xyxy] : null;
+      updateIdentityOptions();$('identity').value=a.object_id;$('classLabel').value=a.class_label;
+      $('visibility').value=a.visibility;$('occlusion').value=a.occlusion;
+      $('confidence').value=a.identity_confidence;$('annotationNote').value=a.annotator_note||'';
+      $('reidNote').value=a.reidentification_note||'';redraw();status('Editing '+a.object_id);
+    };
+    const remove=document.createElement('button');remove.textContent='Delete';remove.className='danger';
+    remove.onclick=()=>{record.annotations.splice(index,1);dirty=true;editing=-1;listObjects();redraw();status('Deleted locally; save frame to persist.');};
+    row.append(text,' ',edit,' ',remove);container.append(row);
+  });
+}
+async function loadFrame() {
+  const frame=currentFrame(), query=`clip=${encodeURIComponent(clip.clip_id)}&frame=${frame}`;
+  record=await api('/api/frame?'+query);editing=-1;draft=null;dirty=false;
+  $('reviewState').value=record.review_state;$('reviewNote').value=record.review_note;
+  $('frameLabel').textContent=`${clip.camera_id} · ${clip.clip_id} · frame ${frame} · ${(frame/clip.fps).toFixed(3)} s · ${framePosition+1}/${clip.frame_indices.length}`;
+  photo=new Image();photo.onload=redraw;photo.src='/frame.jpg?'+query;
+  updateIdentityOptions();listObjects();status('Loaded.');
+}
+function leaveFrame() { if (dirty && !confirm('Unsaved annotation changes. Continue?')) return false; return true; }
+function newIdentity(uncertain) {
+  const existing=new Set([...(identities[clip.clip_id]||[]),...(record?.annotations||[]).map(a=>a.object_id)]);
+  let id;
+  if (uncertain) { id='UNRESOLVED-'+crypto.randomUUID().slice(0,8).toUpperCase(); $('confidence').value='uncertain'; }
+  else { let n=1;do{id=`${clip.clip_id}-OBJ-${String(n++).padStart(3,'0')}`;}while(existing.has(id)); }
+  $('identity').add(new Option(id,id));$('identity').value=id;editing=-1;status('New ID selected: '+id);
+}
+canvas.addEventListener('pointerdown',event=>{dragging=coordinates(event);canvas.setPointerCapture(event.pointerId);});
+canvas.addEventListener('pointerup',event=>{if(!dragging)return;const p=coordinates(event);
+  const box=[Math.max(0,Math.min(dragging[0],p[0])),Math.max(0,Math.min(dragging[1],p[1])),Math.min(canvas.width,Math.max(dragging[0],p[0])),Math.min(canvas.height,Math.max(dragging[1],p[1]))];
+  dragging=null;if(box[2]-box[0]<2||box[3]-box[1]<2){status('Box is too small.',true);return;}draft=box;redraw();status('Box drawn; add/update object and save frame.');});
+$('newId').onclick=()=>newIdentity(false);$('uncertainId').onclick=()=>newIdentity(true);
+$('clearDraft').onclick=()=>{draft=null;editing=-1;redraw();status('Draft cleared.');};
+$('addObject').onclick=()=>{
+  const id=$('identity').value, visibility=$('visibility').value;
+  if(!id){status('Choose or create an object ID.',true);return;}
+  if(visibility!=='not_visible'&&!draft){status('Draw a box for a visible object.',true);return;}
+  const a={object_id:id,bbox_xyxy:visibility==='not_visible'?null:draft,class_label:$('classLabel').value,
+    visibility,occlusion:$('occlusion').value,identity_confidence:$('confidence').value,
+    annotator_note:$('annotationNote').value,reidentification_note:$('reidNote').value};
+  const conflict=record.annotations.findIndex((old,i)=>old.object_id===id&&i!==editing);
+  if(conflict>=0){status('This ID already occurs in the frame.',true);return;}
+  if(editing>=0)record.annotations[editing]=a;else record.annotations.push(a);
+  dirty=true;editing=-1;draft=null;updateIdentityOptions();listObjects();redraw();status('Object updated locally; save frame.');
+};
+$('saveFrame').onclick=async()=>{record.review_state=$('reviewState').value;record.review_note=$('reviewNote').value;
+  try{await api('/api/frame',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+    dirty=false;const id=clip.clip_id;identities[id]=[...new Set([...(identities[id]||[]),...record.annotations.map(a=>a.object_id)])];
+    updateIdentityOptions();status('Saved '+id+' frame '+currentFrame());}
+  catch(error){status(error.message,true);}
+};
+$('prev').onclick=()=>{if(framePosition>0&&leaveFrame()){framePosition--;loadFrame().catch(e=>status(e.message,true));}};
+$('next').onclick=()=>{if(framePosition<clip.frame_indices.length-1&&leaveFrame()){framePosition++;loadFrame().catch(e=>status(e.message,true));}};
+$('clip').onchange=()=>{if(!leaveFrame()){$('clip').value=clip.clip_id;return;}clip=clips.find(c=>c.clip_id===$('clip').value);framePosition=0;loadFrame().catch(e=>status(e.message,true));};
+(async()=>{try{const state=await api('/api/clips');clips=state.clips;identities=state.identities;
+  clips.forEach(c=>$('clip').add(new Option(`${c.clip_id} · ${state.statuses[c.clip_id].complete}/${c.frame_indices.length} complete`,c.clip_id)));
+  clip=clips[0];await loadFrame();}catch(error){status(error.message,true);}})();
+</script>
+</body></html>
